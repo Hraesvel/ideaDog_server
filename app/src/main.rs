@@ -53,7 +53,7 @@ fn main() {
         .expect("Failed to create pool");
 
     //create the SyncArbiters for r2d2
-    let addr = SyncArbiter::start(4, move || DbExecutor(pool.clone()));
+    let addr = SyncArbiter::start(10, move || DbExecutor(pool.clone()));
 
 
     server::new(move || {
@@ -66,8 +66,8 @@ fn main() {
         App::with_state(AppState { database: addr.clone() })
 	        .prefix("/api")
             .default_resource(|r| r.h(NormalizePath::default()))
-            .middleware(Logger::default())
-            .middleware(Logger::new("%a %{User-agent}i"))
+//            .middleware(Logger::default())
+//            .middleware(Logger::new("%a %{User-agent}i"))
 	        .middleware(cors)
             .resource("/", |r| r.f(greatings))
 	        .configure(ideas::config)

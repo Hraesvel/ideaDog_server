@@ -4,3 +4,4 @@ mod models;
 mod database;
 
 pub use database::DbExecutor;
+pub use models::*;
