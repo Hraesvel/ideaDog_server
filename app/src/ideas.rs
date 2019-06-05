@@ -1,17 +1,20 @@
 use crate::AppState;
 use actix_web::http::header::http_percent_encode;
-use actix_web::{AsyncResponder, Path};
 use actix_web::http::Method;
 use actix_web::{App, FutureResponse, HttpResponse, Query, State};
+use actix_web::{AsyncResponder, Path};
 use futures::future::Future;
 use ideadog::QueryIdea;
+use rand::prelude::*;
+use rand::Rng;
 use serde::Deserialize;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/ideas", |scope| {
-        scope.resource("/", |r| {
-            r.method(Method::GET).with(get_ideas);
-        })
+        scope
+            .resource("/", |r| {
+                r.method(Method::GET).with(get_ideas);
+            })
             .resource("/{id}", |r| {
                 r.method(Method::GET).with(get_idea_id);
             })
@@ -50,6 +53,7 @@ fn get_idea_id((path, state): (Path<String>, State<AppState>)) -> FutureResponse
             owner: None,
             owner_id: None,
             tags: None,
+            limit: None,
         })
         .from_err()
         .and_then(|res| match res {

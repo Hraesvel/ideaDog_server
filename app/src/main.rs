@@ -1,14 +1,13 @@
-
 use actix_web::actix::{Addr, SyncArbiter};
+use actix_web::http::{header, NormalizePath};
+use actix_web::middleware::cors::Cors;
+use actix_web::middleware::Logger;
 use actix_web::{actix, server, App, HttpRequest, Responder};
 use env_logger;
 use ideadog::DbExecutor;
 use r2d2;
 use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
 use std::env;
-use actix_web::middleware::cors::Cors;
-use actix_web::http::{header, NormalizePath};
-use actix_web::middleware::Logger;
 
 //routes
 mod ideas;
@@ -19,8 +18,8 @@ pub struct AppState {
     database: Addr<DbExecutor>,
 }
 
-fn greatings(_req : &HttpRequest<AppState>) -> impl Responder {
-    format!("Welcome to ideaDog!")
+fn greatings(_req: &HttpRequest<AppState>) -> impl Responder {
+    format!("Welcome to ideaDog API!")
 }
 
 fn main() {
@@ -53,8 +52,7 @@ fn main() {
         .expect("Failed to create pool");
 
     //create the SyncArbiters for r2d2
-    let addr = SyncArbiter::start(10, move || DbExecutor(pool.clone()));
-
+    let addr = SyncArbiter::start(4, move || DbExecutor(pool.clone()));
 
     server::new(move || {
         let cors = Cors::build()
@@ -63,19 +61,22 @@ fn main() {
             .allowed_header(header::CONTENT_TYPE)
             .finish();
 
-        App::with_state(AppState { database: addr.clone() })
-	        .prefix("/api")
-            .default_resource(|r| r.h(NormalizePath::default()))
-//            .middleware(Logger::default())
-//            .middleware(Logger::new("%a %{User-agent}i"))
-	        .middleware(cors)
-            .resource("/", |r| r.f(greatings))
-	        .configure(ideas::config)
-	        .finish()
-    }).bind("0.0.0.0:5000")
-        .expect("")
-        .workers(10)
-        .start();
+        App::with_state(AppState {
+            database: addr.clone(),
+        })
+        .prefix("/api")
+        .default_resource(|r| r.h(NormalizePath::default()))
+        .middleware(Logger::default())
+        .middleware(Logger::new("%a %{User-agent}i"))
+        .middleware(cors)
+        .resource("/", |r| r.f(greatings))
+        .configure(ideas::config)
+        .finish()
+    })
+    .bind("0.0.0.0:5000")
+    .expect("")
+    .workers(4)
+    .start();
 
     println!("Starting http server: 0.0.0.0:5000");
     let _ = ideadog_system.run();

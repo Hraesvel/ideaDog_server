@@ -48,4 +48,6 @@ pub struct QueryIdea {
     pub owner_id: Option<String>,
     // accept tags for query string
     pub tags: Option<Vec<String>>,
+
+    pub limit: Option<u32>,
 }
