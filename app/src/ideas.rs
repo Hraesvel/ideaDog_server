@@ -36,6 +36,7 @@ fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureRespon
             owner: None,
             owner_id: None,
             tags: None,
+            limit: None
         })
         .from_err()
         .and_then(|res| match res {
