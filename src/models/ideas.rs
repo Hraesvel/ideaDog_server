@@ -1,9 +1,10 @@
 use serde::Deserialize;
+use serde::Serialize;
 use std::collections::HashMap;
 
 use crate::models::Tag;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Votes {
     pub up_vote: HashMap<String, u32>,
     pub down_vote: HashMap<String, u32>,
@@ -39,10 +40,8 @@ pub struct NewIdea {
 }
 
 pub struct QueryIdea {
-    // _key field from arangodb
-    pub _key: Option<String>,
-    // _id field from arangodb
-    pub _id: Option<String>,
+    //id
+    pub id: Option<String>,
     // Owner's username
     pub owner: Option<String>,
     // Owner's string id

@@ -1,4 +1,5 @@
 use crate::models::{Idea, NewIdea, QueryIdea};
+use crate::models::handler::IdeaTmp;
 use actix_web::actix::Message;
 use r2d2::Error;
 use serde_json::Value;
@@ -12,5 +13,5 @@ impl Message for NewIdea {
 }
 
 impl Message for QueryIdea {
-	type Result = Result<Vec<Value>, Error>;
+	type Result = Result<Vec<IdeaTmp>, Error>;
 }

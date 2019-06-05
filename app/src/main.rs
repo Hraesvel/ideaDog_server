@@ -74,7 +74,7 @@ fn main() {
 	        .finish()
     }).bind("0.0.0.0:5000")
         .expect("")
-        .workers(4)
+        .workers(10)
         .start();
 
     println!("Starting http server: 0.0.0.0:5000");
