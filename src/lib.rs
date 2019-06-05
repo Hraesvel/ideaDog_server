@@ -1,7 +1,6 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+//! IdeaDog is a Social platform for sharing one's idea with the world.
+
+mod models;
+mod database;
+
+pub use database::DbExecutor;

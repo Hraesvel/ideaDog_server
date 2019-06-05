@@ -1,7 +1,22 @@
 [package]
-name = "IdeaDog_server"
+name = "ideadog"
 version = "0.1.0"
 authors = ["martin smith <msmith3d@icloud.com>"]
 edition = "2018"
 
+[workspace]
+members = [".", "app"]
+
 [dependencies]
+r2d2-arangodb = {path = "../r2d2-arangodb"}
+r2d2 = "0.8.4"
+arangors = {path = "../arangors"}
+chrono = "0.4.6"
+actix = "0.7"
+actix-web = "0.7"
+serde = "1.0.92"
+serde_derive = "1.0.92"
+futures = "0.1.27"
+
+
+
