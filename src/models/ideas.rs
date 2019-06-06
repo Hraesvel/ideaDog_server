@@ -1,14 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::{error, fmt};
-use crate::models::Tag;
 use arangors::AqlQuery;
 use r2d2::PooledConnection;
 use r2d2_arangodb::ArangodbConnectionManager;
-use std::error::Error;
-use std::io::ErrorKind;
-use serde_derive::*;
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
@@ -91,6 +85,7 @@ pub struct NewIdea {
     pub tags: Vec<String>,
 }
 
+//noinspection RsExternalLinter
 fn temp_user() -> String {
     format!("abc")
 }

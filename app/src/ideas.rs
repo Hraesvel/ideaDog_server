@@ -1,12 +1,12 @@
 use crate::AppState;
-use actix_web::http::header::http_percent_encode;
+
 use actix_web::http::Method;
 use actix_web::{App, FutureResponse, HttpResponse, Query, State, Json};
 use actix_web::{AsyncResponder, Path};
 use futures::future::Future;
-use ideadog::{QueryIdea, Sort, NewIdea, Tag};
+use ideadog::{QueryIdea, Sort, NewIdea};
 use serde::Deserialize;
-use futures::sink::Sink;
+use futures;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
 	cfg.resource("/ideas", |r| {
@@ -50,7 +50,7 @@ fn run_query(qufigs: QueryIdea, state: State<AppState>) -> FutureResponse<HttpRe
 		.responder()
 }
 
-fn get_ideas_sort((path, q_string, state): (Path<String>, Query<Param>, State<AppState>)) -> FutureResponse<HttpResponse> {
+fn get_ideas_sort((path, _q_string, state): (Path<String>, Query<Param>, State<AppState>)) -> FutureResponse<HttpResponse> {
 	let mut q = QueryIdea {
 		sort: Sort::ALL,
 		id: None,
@@ -93,7 +93,7 @@ fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureRespon
 }
 
 fn get_idea_id((path, state): (Path<String>, State<AppState>)) -> FutureResponse<HttpResponse> {
-	let mut q = QueryIdea {
+	let q = QueryIdea {
 		sort: Sort::ALL,
 		id: Some(path.into_inner()),
 		owner: None,

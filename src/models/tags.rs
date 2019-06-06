@@ -1,5 +1,4 @@
 use serde::{Serialize, Deserialize};
-use serde_derive::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Tag {
