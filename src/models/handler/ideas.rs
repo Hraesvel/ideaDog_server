@@ -15,6 +15,7 @@ impl Handler<QueryIdea> for DbExecutor {
     fn handle(&mut self, msg: QueryIdea, _ctx: &mut Self::Context) -> Self::Result {
         let conn = &self.0.get().unwrap();
 
+
         let mut query = "FOR ele in ideas ".to_string();
 
         // Handles Sort

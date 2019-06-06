@@ -1,5 +1,5 @@
 use actix_web::actix::{Addr, SyncArbiter};
-use actix_web::http::{header, NormalizePath};
+use actix_web::http::{header, NormalizePath, StatusCode};
 use actix_web::middleware::cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::{actix, server, App, HttpRequest, Responder};
@@ -13,7 +13,6 @@ use std::env;
 mod views;
 //mod ideas;
 
-
 pub struct AppState {
     database: Addr<DbExecutor>,
 }
@@ -26,6 +25,18 @@ fn main() {
     let _ = dotenv::dotenv();
     env::set_var("RUST_LOG", "actix_web=info");
     env_logger::init();
+
+    let hostname = format!(
+        "{host}:{port}",
+        host = env::var("HOST").unwrap_or_else(|_| {
+            println!("HOST is not set, will Default to localhost.");
+            format!("localhost")
+        }),
+        port = env::var("PORT").unwrap_or_else(|_| {
+            println!("PORT is not set, will Default to 5000.");
+            5000.to_string()
+        })
+    );
 
     //actix System for handling Actors
     let ideadog_system = actix::System::new("ideaDog");
@@ -73,11 +84,11 @@ fn main() {
         .configure(views::ideas::config)
         .finish()
     })
-        .bind("0.0.0.0:5000")
+        .bind(hostname.clone())
         .unwrap()
         .workers(2)
         .start();
 
-    println!("Starting http server: 0.0.0.0:5000");
+    println!("Starting http server: {}", hostname);
     let _ = ideadog_system.run();
 }
