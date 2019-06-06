@@ -8,7 +8,7 @@ impl Message for Idea {
 }
 
 impl Message for NewIdea {
-	type Result = Result<NewIdea, Error>;
+	type Result = Result<(), Error>;
 }
 
 impl Message for QueryIdea {

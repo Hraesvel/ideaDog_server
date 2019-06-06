@@ -1,12 +1,14 @@
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
-
+use std::{error, fmt};
 use crate::models::Tag;
 use arangors::AqlQuery;
 use r2d2::PooledConnection;
 use r2d2_arangodb::ArangodbConnectionManager;
 use std::error::Error;
+use std::io::ErrorKind;
+use serde_derive::*;
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
@@ -33,7 +35,7 @@ impl Owner {
 	/// let owner = Owner::get_owner(msg.owner_id, &conn).map_err(|x| return x);
 	/// assert!(owner.is_ok())
 	/// ```
-    pub fn get_owner(id: String, conn: &Connection) -> Result<Owner, Error> {
+    pub fn get_owner(id: String, conn: &Connection) -> Option<Owner> {
         let ident = if id.contains('/') {
             id
         } else {
@@ -44,10 +46,10 @@ impl Owner {
 	        .bind_var("ident", ident)
 	        .batch_size(1);
 
-	    let owner : Result<Owner, Error> = match conn.aql_query(aql) {
-		    Ok(r) => Ok(r),
-		    Err(e) => Err(e)
-	    }
+	    let owner = match conn.aql_query(aql) {
+		    Ok(mut r) => Some(r.pop().unwrap()),
+		    Err(e) => {println!("Error: {}",e); None},
+	    };
 
 	    owner
     }
@@ -57,10 +59,10 @@ impl Owner {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Idea {
     // _id field from arangodb
-    #[serde(alias = "_id")]
+    #[serde(alias="_id")]
     pub id: String,
     // _key field from arangodb
-    #[serde(alias = "_key")]
+    #[serde(alias="_key")]
     pub key: String,
     // title of the idea
     pub text: String,
@@ -76,15 +78,15 @@ pub struct Idea {
     pub date: i64,
 }
 
+#[derive(Debug, Clone)]
 pub struct NewIdea {
     // title of the idea
     pub text: String,
-
-    #[serde(default = temp_user)]
+//    #[serde(default="temp_user")]
     // Owner's username
     pub owner_id: String,
 
-    pub tags: Vec<Tag>,
+    pub tags: Vec<String>,
 }
 
 fn temp_user() -> String {

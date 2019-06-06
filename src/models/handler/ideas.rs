@@ -7,8 +7,10 @@ use r2d2::Error;
 use r2d2_arangodb::ArangodbConnectionManager;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
+use serde_derive::*;
 use serde_json::Value;
 use std::collections::HashMap;
+
 use std::borrow::Cow::Owned;
 
 impl Handler<QueryIdea> for DbExecutor {
@@ -18,10 +20,17 @@ impl Handler<QueryIdea> for DbExecutor {
 		let conn = &self.0.get().unwrap();
 
 		let mut query = "FOR ele in ideas ".to_string();
+
+		// Handles Sort
 		match &msg.sort {
 			Sort::ALL => {},
 			Sort::BRIGHT => { query.push_str("SORT ele.date ") }
 		}
+
+		// Handles filters
+//		match &msg.tags {
+//
+//		}
 
 		query.push_str("RETURN ele");
 
@@ -45,34 +54,38 @@ impl Handler<QueryIdea> for DbExecutor {
 }
 
 impl Handler<NewIdea> for DbExecutor {
-	type Result = Result<Idea, Error>;
+	type Result = Result<(), Error>;
 
 	fn handle(&mut self, msg: NewIdea, ctx: &mut Self::Context) -> Self::Result {
+
+		#[derive(Debug, Serialize)]
+		struct TmpIdea {
+			// title of the idea
+			pub text: String,
+			// Owner's username
+			pub owner: Owner,
+
+			pub tags: Vec<String>,
+		}
+
 		let conn = self.0.get().unwrap();
 
-		let mut obj = HashMap::new();
-		let owner = Owner::get_owner(msg.owner_id, &conn).map_err(|x| return x).unwrap();
-		let t : Vec<String> = msg.tags.iter().map(|x| x._key).collect();
-		obj.insert("text",  msg.text);
-		obj.insert("tags", t.serialize());
-		obj.insert("owner", owner.serialize() );
+		let new_idea = TmpIdea {
+			owner: Owner::get_owner(msg.owner_id, &conn).expect("Fail to get owner details."),
+			text: msg.text.clone(),
+			tags: msg.tags.clone(),
+		};
 
-		// owner : { _id: 'users/key', _key: 'key', }
+		let data = serde_json::to_value(&new_idea).unwrap();
 
+		let query = dbg!(format!("INSERT {data} INTO {collection}", data=data, collection="ideas"));
 
-		let aql = AqlQuery::new("INSERT @@obj INTO @@col")
-			.bind_var("@obj", obj)
-			.bind_var("@col", ideas)
+		let aql = AqlQuery::new(&query)
 			.batch_size(1);
 
-		let request : Idea = match conn.aql_query(aql)
-			{
-				Ok(r) => r,
-				Err(e) => {println!("fail to create idea"); vec![]}
-			};
+		let _ : Vec<Idea> = dbg!(conn.aql_query(aql).map_err(|e| panic!("Error: {}", e)).unwrap());
 
-
-		Ok(request)
+		Ok(())
 	}
 
 }
