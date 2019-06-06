@@ -10,9 +10,9 @@ use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
 use std::env;
 
 //routes
-mod ideas;
-mod tags;
-mod users;
+mod views;
+//mod ideas;
+
 
 pub struct AppState {
     database: Addr<DbExecutor>,
@@ -70,7 +70,7 @@ fn main() {
         .middleware(Logger::new("%a %{User-agent}i"))
         .middleware(cors)
         .resource("/", |r| r.f(greatings))
-        .configure(ideas::config)
+        .configure(views::ideas::config)
         .finish()
     })
         .bind("0.0.0.0:5000")

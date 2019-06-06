@@ -1,13 +1,10 @@
 use actix::Handler;
 use arangors;
 use arangors::AqlQuery;
-use chrono::{Utc};
+use chrono::Utc;
 use r2d2::Error;
 
-
 use serde::{Deserialize, Serialize};
-
-
 
 use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
 use crate::DbExecutor;
@@ -96,7 +93,9 @@ impl Handler<NewIdea> for DbExecutor {
         let response: Idea = conn
             .aql_query(aql)
             .map_err(|e| panic!("Error: {}", e))
-            .unwrap().pop().unwrap();
+            .unwrap()
+            .pop()
+            .unwrap();
 
         Ok(response)
     }

@@ -112,6 +112,10 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
 		owner_id: idea.owner_id.clone(),
 		tags: idea.tags.clone()
 	};
+
+	if new.text.len() > 140 {
+		Ok(HttpResponse::BadRequest().into())
+	}
 	state
 		.database
 		.send(new)
