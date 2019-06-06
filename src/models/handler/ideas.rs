@@ -10,8 +10,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use serde_derive::*;
 use serde_json::Value;
 use std::collections::HashMap;
-
-use std::borrow::Cow::Owned;
+use chrono::{DateTime, Utc, NaiveDateTime};
 
 impl Handler<QueryIdea> for DbExecutor {
 	type Result = Result<Vec<Idea>, Error>;
@@ -57,28 +56,36 @@ impl Handler<NewIdea> for DbExecutor {
 	type Result = Result<(), Error>;
 
 	fn handle(&mut self, msg: NewIdea, ctx: &mut Self::Context) -> Self::Result {
-
-		#[derive(Debug, Serialize)]
-		struct TmpIdea {
+		#[derive(Deserialize, Serialize, Debug)]
+		pub struct IdeaMIN {
 			// title of the idea
 			pub text: String,
+			// description of idea
 			// Owner's username
 			pub owner: Owner,
-
+			// This field is for the votes.
+			#[serde(default)]
+			pub upvotes: u32,
+			#[serde(default)]
+			pub downvotes: u32,
 			pub tags: Vec<String>,
+			pub date: i64
 		}
 
 		let conn = self.0.get().unwrap();
 
-		let new_idea = TmpIdea {
-			owner: Owner::get_owner(msg.owner_id, &conn).expect("Fail to get owner details."),
+		let new_idea = IdeaMIN {
 			text: msg.text.clone(),
 			tags: msg.tags.clone(),
+			owner: Owner::get_owner(msg.owner_id, &conn).expect("Fail to get owner details."),
+			upvotes: 0,
+			downvotes: 0,
+			date: Utc::now().timestamp_millis()
 		};
 
 		let data = serde_json::to_value(&new_idea).unwrap();
 
-		let query = dbg!(format!("INSERT {data} INTO {collection}", data=data, collection="ideas"));
+		let query = dbg!(format!("INSERT {data} INTO {collection} LET i = NEW RETURN i", data = data, collection = "ideas"));
 
 		let aql = AqlQuery::new(&query)
 			.batch_size(1);

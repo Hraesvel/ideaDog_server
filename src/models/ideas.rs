@@ -70,7 +70,9 @@ pub struct Idea {
     // Owner's username
     pub owner: Owner,
     // This field is for the votes.
+    #[serde(default)]
     pub upvotes: u32,
+	#[serde(default)]
     pub downvotes: u32,
 
     pub tags: Vec<String>,
