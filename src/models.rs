@@ -1,5 +1,4 @@
-
-pub use self::ideas::{Idea, NewIdea, QueryIdea, Votes};
+pub use self::ideas::{Idea, NewIdea, QueryIdea, Sort};
 pub use self::users::User;
 pub use self::tags::Tag;
 

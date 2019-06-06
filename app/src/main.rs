@@ -52,7 +52,7 @@ fn main() {
         .expect("Failed to create pool");
 
     //create the SyncArbiters for r2d2
-    let addr = SyncArbiter::start(4, move || DbExecutor(pool.clone()));
+    let addr = SyncArbiter::start(2, move || DbExecutor(pool.clone()));
 
     server::new(move || {
         let cors = Cors::build()
@@ -73,10 +73,10 @@ fn main() {
         .configure(ideas::config)
         .finish()
     })
-    .bind("0.0.0.0:5000")
-    .expect("")
-    .workers(4)
-    .start();
+        .bind("0.0.0.0:5000")
+        .unwrap()
+        .workers(2)
+        .start();
 
     println!("Starting http server: 0.0.0.0:5000");
     let _ = ideadog_system.run();

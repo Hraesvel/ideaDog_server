@@ -6,16 +6,23 @@ use crate::models::Tag;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Owner {
+	// _id field from arangodb
+	#[serde(alias = "_id")]
 	pub id: String,
+	// _key field from arangodb
+	#[serde(alias = "_key", default)]
+	pub key: String,
 	pub name: String
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Idea {
-	// _key field from arangodb
-	pub _key: String,
 	// _id field from arangodb
-	pub _id: String,
+	#[serde(alias = "_id")]
+	pub id: String,
+	// _key field from arangodb
+	#[serde(alias = "_key")]
+	pub key: String,
 	// title of the idea
 	pub text: String,
 	// description of idea
@@ -25,7 +32,7 @@ pub struct Idea {
 	pub upvotes: u32,
 	pub downvotes: u32,
 
-	pub tag: Vec<String>,
+	pub tags: Vec<String>,
 
 	pub date: i64
 }

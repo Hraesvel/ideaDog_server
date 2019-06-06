@@ -1,16 +1,13 @@
-use crate::models::{NewIdea, QueryIdea, Idea};
+use crate::models::{Idea, NewIdea, QueryIdea, Sort};
 use crate::DbExecutor;
 use actix::Handler;
 use arangors;
-use serde::{Deserialize, Serialize, Serializer};
-use serde::ser::SerializeStruct;
-use r2d2_arangodb::ArangodbConnectionManager;
-use serde_json::Value;
 use arangors::AqlQuery;
 use r2d2::Error;
-use rand::prelude::*;
-use rand::Rng;
-
+use r2d2_arangodb::ArangodbConnectionManager;
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize, Serializer};
+use serde_json::Value;
 
 impl Handler<QueryIdea> for DbExecutor {
 	type Result = Result<Vec<Idea>, Error>;
@@ -18,21 +15,29 @@ impl Handler<QueryIdea> for DbExecutor {
 	fn handle(&mut self, msg: QueryIdea, ctx: &mut Self::Context) -> Self::Result {
 		let conn = &self.0.get().unwrap();
 
-		let aql = AqlQuery::new("FOR i in ideas RETURN i")
-			.batch_size(25);
+		let mut query = "FOR ele in ideas ".to_string();
+		match &msg.sort {
+			Sort::ALL => {},
+			Sort::BRIGHT => { query.push_str("SORT ele.date ") }
+		}
+
+		query.push_str("RETURN ele");
+
+		let mut aql = AqlQuery::new(dbg!(&query)).batch_size(25);
 
 		if let Some(id) = msg.id {
-			aql = AqlQuery::new("RETURN DOCUMENT(CONCAT('ideas/' @id ))")
+			aql = AqlQuery::new("RETURN DOCUMENT(CONCAT('ideas/', @id ))")
 				.bind_var("id", id)
 				.batch_size(1);
 		}
 
 		let request: Vec<Idea> = match conn.aql_query(aql) {
 			Ok(r) => r,
-			Err(_) => vec!(),
-		}
-
-
+			Err(e) => {
+				println!("{}", e);
+				vec![]
+			}
+		};
 		Ok(request)
 	}
 }

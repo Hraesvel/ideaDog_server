@@ -1,4 +1,4 @@
-use crate::models::{Idea, NewIdea, QueryIdea, Idea};
+use crate::models::{Idea, NewIdea, QueryIdea};
 use actix_web::actix::Message;
 use r2d2::Error;
 use serde_json::Value;
