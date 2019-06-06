@@ -1,4 +1,4 @@
-use crate::models::{Idea, NewIdea, QueryIdea, Sort};
+use crate::models::{Idea, NewIdea, QueryIdea, Sort, Owner};
 use crate::DbExecutor;
 use actix::Handler;
 use arangors;
@@ -8,6 +8,8 @@ use r2d2_arangodb::ArangodbConnectionManager;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
+use std::collections::HashMap;
+use std::borrow::Cow::Owned;
 
 impl Handler<QueryIdea> for DbExecutor {
 	type Result = Result<Vec<Idea>, Error>;
@@ -42,10 +44,35 @@ impl Handler<QueryIdea> for DbExecutor {
 	}
 }
 
-//impl Handler<NewIdea> for DbExecutor {
-//	type Result = ();
-//
-//	fn handle(&mut self, msg: NewIdea, ctx: &mut Self::Context) -> Self::Result {
-//		unimplemented!()
-//	}
-//}
+impl Handler<NewIdea> for DbExecutor {
+	type Result = Result<Idea, Error>;
+
+	fn handle(&mut self, msg: NewIdea, ctx: &mut Self::Context) -> Self::Result {
+		let conn = self.0.get().unwrap();
+
+		let mut obj = HashMap::new();
+		let owner = Owner::get_owner(msg.owner_id, &conn).map_err(|x| return x).unwrap();
+		let t : Vec<String> = msg.tags.iter().map(|x| x._key).collect();
+		obj.insert("text",  msg.text);
+		obj.insert("tags", t.serialize());
+		obj.insert("owner", owner.serialize() );
+
+		// owner : { _id: 'users/key', _key: 'key', }
+
+
+		let aql = AqlQuery::new("INSERT @@obj INTO @@col")
+			.bind_var("@obj", obj)
+			.bind_var("@col", ideas)
+			.batch_size(1);
+
+		let request : Idea = match conn.aql_query(aql)
+			{
+				Ok(r) => r,
+				Err(e) => {println!("fail to create idea"); vec![]}
+			};
+
+
+		Ok(request)
+	}
+
+}

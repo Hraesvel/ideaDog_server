@@ -1,7 +1,10 @@
+
 pub struct Tag {
+	#[serde(alias = "key")]
 	pub _key: String,
+	#[serde(alias = "id")]
 	pub _id: String,
-	pub label: String,
-	pub description: Option<String>,
+	#[serde(default)]
+	pub count: u64
 }
 
