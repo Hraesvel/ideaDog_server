@@ -15,8 +15,11 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
             .resource("/", |r| {
                 r.method(Method::GET).with(get_ideas);
             })
-            .resource("/{id}", |r| {
+    })
+       .scope("/idea", |scope| {
+	       scope.resource("/{id}", |r| {
                 r.method(Method::GET).with(get_idea_id);
+//                r.method(Method::POST).with(post_idea);
             })
     })
 }
@@ -32,6 +35,7 @@ fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureRespon
     state
         .database
         .send(QueryIdea {
+	        sort: Sort::ALL,
             id: None,
             owner: None,
             owner_id: None,
@@ -50,6 +54,7 @@ fn get_idea_id((path, state): (Path<String>, State<AppState>)) -> FutureResponse
     state
         .database
         .send(QueryIdea {
+	        sort: Sort::ALL,
             id: Some(path.into_inner()),
             owner: None,
             owner_id: None,
