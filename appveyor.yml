@@ -88,7 +88,10 @@ branches:
 
 notifications:
   - provider: Email
-    on_build_success: success
+    to:
+      - mcodesmith@gmail.com
+    on_build_success: true
+    on_build_failure: false
 
 # Building is done in the test phase, so we disable Appveyor's build phase.
 build: false

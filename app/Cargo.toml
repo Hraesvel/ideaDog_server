@@ -1,8 +1,10 @@
 [package]
 name = "ideadog-server"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["martin smith <msmith3d@icloud.com>"]
 edition = "2018"
+license = "MIT"
+description =  "Backend server for ideaDog project"
 
 [dependencies]
 actix-web = "0.7"
@@ -31,7 +33,7 @@ branch = "develop"
 [package.metadata.deb]
 maintainer = "ideaDog developer <mcodesmith@gmail.com>"
 copyright = "2019"
-license-file = ["LICENSE"]
+license-file = ["../LICENSE"]
 extended-description = "backend server for the ideaDog project"
 depends = "$auto"
 
