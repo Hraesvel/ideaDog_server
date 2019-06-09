@@ -8,7 +8,8 @@ environment:
     RUST_VERSION: stable
 
     # TODO Update this to match the name of your project.
-    CRATE_NAME: ideaDog-server
+    CRATE_NAME: ideadog-server
+    
 
   # TODO These are all the build jobs. Adjust as necessary. Comment out what you
   # don't need
@@ -52,26 +53,27 @@ test_script:
 
 before_deploy:
   # TODO Update this to build the artifacts that matter to you
-  - cargo rustc --target %TARGET% --release --bin ideadog-server -- -C lto
+  - cargo rustc --target %TARGET% --release -p ideadog-server -- -C lto
   - ps: ci\before_deploy.ps1
 
 deploy:
   artifact: /.*\.zip/
-
+  tag: $(APPVEYOR_REPO_TAG_NAME)
+  
   # TODO update `auth_token.secure`
   # - Create a `public_repo` GitHub token. Go to: https://github.com/settings/tokens/new
   # - Encrypt it. Go to https://ci.appveyor.com/tools/encrypt
   # - Paste the output down here
   auth_token:
-    secure: emo0IdK6EF4+zqDaFv9MRBOm5PFQkLNPfhutvjwMqy7L238aLZfeH89O79nMDK8q
-  description: ''
+    secure: sWV9RcbYkm+cdpQ3XhSItHNHUrB5WumIJpQZYzgqUeGKlFFqeZpx3b/rTDw6YHQi
+  description: 'Delpoyment for ideaDog-server_$(appveyor_repo_tag_name)'
   on:
     # TODO Here you can pick which targets will generate binary releases
     # In this example, there are some targets that are tested using the stable
     # and nightly channels. This condition makes sure there is only one release
     # for such targets and that's generated using the stable channel
     RUST_VERSION: stable
-    appveyor_repo_tag: true
+    APPVEYOR_REPO_TAG: true
   provider: GitHub
 
 cache:
