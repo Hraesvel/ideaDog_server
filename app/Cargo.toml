@@ -29,6 +29,10 @@ version = "0.1"
 branch = "develop"
 
 [package.metadata.deb]
+maintainer = "ideaDog developer <mcodesmith@gmail.com>"
+copyright = "2019"
+license-file = ["LICENSE"]
+extended-description = "backend server for the ideaDog project"
 depends = "$auto"
 
 
