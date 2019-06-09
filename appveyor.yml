@@ -10,7 +10,6 @@ environment:
     # TODO Update this to match the name of your project.
     CRATE_NAME: ideaDog-server
     
-    appveyor_repo_tag: true
 
   # TODO These are all the build jobs. Adjust as necessary. Comment out what you
   # don't need
@@ -65,7 +64,7 @@ deploy:
   # - Encrypt it. Go to https://ci.appveyor.com/tools/encrypt
   # - Paste the output down here
   auth_token:
-    secure: emo0IdK6EF4+zqDaFv9MRBOm5PFQkLNPfhutvjwMqy7L238aLZfeH89O79nMDK8q
+    secure: sWV9RcbYkm+cdpQ3XhSItHNHUrB5WumIJpQZYzgqUeGKlFFqeZpx3b/rTDw6YHQi
   description: 'Delpoyment for ideaDog server'
   on:
     # TODO Here you can pick which targets will generate binary releases
