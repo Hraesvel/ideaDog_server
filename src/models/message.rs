@@ -1,1 +1,2 @@
 mod ideas;
+mod tags;

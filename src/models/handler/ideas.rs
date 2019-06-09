@@ -8,6 +8,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
 use crate::DbExecutor;
+use actix_web::http::header::q;
+
+fn filter_with(data: Vec<String>) -> String {
+    let mut q_string = "FILTER ".to_string();
+    let s = data.iter().map(|x| format!("'{}' IN ele.tags ", x)).collect::<Vec<String>>().join(" AND ");
+
+    q_string.push_str(s.as_str());
+    q_string
+}
 
 impl Handler<QueryIdea> for DbExecutor {
     type Result = Result<Vec<Idea>, Error>;
@@ -15,20 +24,19 @@ impl Handler<QueryIdea> for DbExecutor {
     fn handle(&mut self, msg: QueryIdea, _ctx: &mut Self::Context) -> Self::Result {
         let conn = &self.0.get().unwrap();
 
-
         let mut query = "FOR ele in ideas ".to_string();
+
+        if let Some(tags) = msg.tags {
+            query.push_str(filter_with(tags).as_str());
+        }
 
         // Handles Sort
         match &msg.sort {
-            Sort::ALL => {}
-            Sort::BRIGHT => query.push_str("SORT ele.date DESC "),
+            Sort::ALL => query.push_str("SORT ele.date DESC "),
+            Sort::BRIGHT => query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC "),
         }
 
-        // Handles filters
-        //		match &msg.tags {
-        //
-        //		}
-
+        dbg!(&query);
         query.push_str("RETURN ele");
 
 	    let mut aql = AqlQuery::new(&query).batch_size(25);
@@ -90,7 +98,6 @@ impl Handler<NewIdea> for DbExecutor {
         );
 
         let aql = AqlQuery::new(&query).batch_size(1);
-
         let response: Idea = conn
             .aql_query(aql)
             .map_err(|e| panic!("Error: {}", e))

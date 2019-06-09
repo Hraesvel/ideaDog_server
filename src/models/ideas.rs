@@ -6,7 +6,7 @@ use r2d2_arangodb::ArangodbConnectionManager;
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Owner {
     // _id field from arangodb
     #[serde(alias = "_id")]
@@ -50,7 +50,7 @@ impl Owner {
 
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Idea {
     // _id field from arangodb
     #[serde(alias="_id")]
@@ -90,6 +90,7 @@ fn temp_user() -> String {
     format!("abc")
 }
 
+#[derive(Debug)]
 pub enum Sort {
     ALL,
     BRIGHT,
