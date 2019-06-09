@@ -1,6 +1,6 @@
 use crate::AppState;
 
-use actix_web::http::{Method, StatusCode, NormalizePath};
+use actix_web::http::{Method, NormalizePath, StatusCode};
 use actix_web::{App, FutureResponse, HttpResponse, Json, Query, State};
 use actix_web::{AsyncResponder, Path};
 use futures;
@@ -17,9 +17,15 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
 	   })
 	   .scope("/idea", |scope| {
 		   scope
-			   .default_resource(|r| r.h(NormalizePath::new(true, true, StatusCode::TEMPORARY_REDIRECT)))
+			   .default_resource(|r| {
+				   r.h(NormalizePath::new(
+					   true,
+					   true,
+					   StatusCode::TEMPORARY_REDIRECT,
+				   ))
+			   })
 			   .resource("/", |r| r.method(Method::POST).with(create_idea))
-//            .resource("/", |r| r.method(Method::POST).with(create_idea))
+			   //            .resource("/", |r| r.method(Method::POST).with(create_idea))
 			   .resource("/{id}/", |r| {
 				   r.method(Method::GET).with(get_idea_id);
 				   //                r.method(Method::POST).with(post_idea);
@@ -60,7 +66,7 @@ fn get_ideas_sort(
 		let v_string: Vec<String> = value.clone().split(',').map(|x| x.to_string()).collect();
 		vec_of_tags = Some(v_string);
 	};
-	
+
 	let mut q = QueryIdea {
 		sort: Sort::ALL,
 		id: None,
@@ -140,4 +146,85 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
 			Err(_) => Ok(HttpResponse::InternalServerError().into()),
 		})
 		.responder()
+}
+
+#[cfg(test)]
+mod test {
+	use crate::views::ideas::{create_idea, get_idea_id, get_ideas, get_ideas_sort};
+	use crate::{views, AppState};
+	use actix_web::actix::SyncArbiter;
+	use actix_web::http::{Method, NormalizePath};
+	use actix_web::test::TestServer;
+	use ideadog::DbExecutor;
+	use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
+	use serde_json::error::Category::Syntax;
+	use std::env;
+
+	fn build_test_server() -> TestServer {
+		let _ = dotenv::dotenv();
+		let mut srv = TestServer::build_with_state(|| {
+			let adder = SyncArbiter::start(3, || {
+				// arangodb connection configurations.
+				let arango_config = ConnectionOptions::builder()
+					.with_auth_jwt(
+						env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
+						env::var("DB_PASSWORD").expect("DB_PASSWORD must be set."),
+					)
+					.with_host(
+						env::var("DB_HOST").expect("DB_HOST must be set"),
+						env::var("DB_PORT")
+							.expect("DB_PORT must be set")
+							.parse()
+							.expect("DB_PORT must be digits"),
+					)
+					.with_db(env::var("DB_NAME").expect("DB_NAME must be set."))
+					.build();
+				let manager = ArangodbConnectionManager::new(arango_config);
+
+				let pool = r2d2::Pool::builder()
+					.build(manager)
+					.expect("Failed to create pool");
+
+				DbExecutor(pool.clone())
+			});
+			AppState {
+				database: adder.clone(),
+			}
+		})
+			.start(|app| {
+				app.resource("/ideas", |r| {
+					r.method(Method::GET).with(get_ideas);
+				})
+				   .resource("/ideas/{sort}", |r| {
+					   r.method(Method::GET).with(get_ideas_sort);
+				   })
+				   .resource("/idea", |r| r.method(Method::POST).with(create_idea))
+				   .resource("/idea/{id}/", |r| {
+					   r.method(Method::GET).with(get_idea_id);
+				   });
+			});
+
+
+		srv
+	}
+
+	#[test]
+	fn test_get_all_ideas() {
+		let mut srv = build_test_server();
+
+		let all_ideas = srv.client(Method::GET, "/ideas").finish().unwrap();
+		let response = srv.execute(all_ideas.send()).unwrap();
+
+		dbg!(&response);
+		assert!(response.status().is_success());
+	}
+
+	#[test]
+	fn test_get_sorted_ideas() {
+		let mut srv = build_test_server();
+
+		let sort_ideas = srv.client(Method::GET, "/ideas/bright").finish().unwrap();
+		let response = srv.execute(sort_ideas.send()).unwrap();
+		assert!(response.status().is_success());
+	}
 }
