@@ -25,6 +25,8 @@ branch = "develop"
 
 [dependencies.r2d2-arangodb]
 git = "https://github.com/Ostoyae/r2d2-arangodb.git"
+version = "0.1"
+branch = "develop"
 
 [package.metadata.deb]
 depends = "$auto"
