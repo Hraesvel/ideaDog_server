@@ -64,7 +64,7 @@ deploy:
   # - Paste the output down here
   auth_token:
     secure: emo0IdK6EF4+zqDaFv9MRBOm5PFQkLNPfhutvjwMqy7L238aLZfeH89O79nMDK8q
-  description: ''
+  description: 'Delpoyment for ideaDog server'
   on:
     # TODO Here you can pick which targets will generate binary releases
     # In this example, there are some targets that are tested using the stable
