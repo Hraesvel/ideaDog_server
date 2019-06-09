@@ -38,6 +38,11 @@ test:cargo:
       - cargo/
 
 build:cargo:
+  only:
+    - tags
+  except:
+    - branches
+
   stage: build
   script: cargo build -p ideaDog-server --release
   cache:
