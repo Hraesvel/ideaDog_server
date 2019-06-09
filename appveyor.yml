@@ -47,14 +47,12 @@ test_script:
     cargo build --target %TARGET% &&
     cargo build --target %TARGET% --release &&
     cargo test --target %TARGET% &&
-    cargo test --target %TARGET% --release &&
-    cargo run --target %TARGET% &&
-    cargo run --target %TARGET% --release
+    cargo test --target %TARGET% --release
     )
 
 before_deploy:
   # TODO Update this to build the artifacts that matter to you
-  - cargo rustc --target %TARGET% --release --bin hello -- -C lto
+  - cargo rustc --target %TARGET% --release --bin ideadog-server -- -C lto
   - ps: ci\before_deploy.ps1
 
 deploy:
@@ -88,7 +86,10 @@ branches:
 
 notifications:
   - provider: Email
-    on_build_success: success
+    to:
+      - mcodesmith@gmail.com
+    on_build_success: true
+    on_build_failure: false
 
 # Building is done in the test phase, so we disable Appveyor's build phase.
 build: false
