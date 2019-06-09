@@ -25,7 +25,7 @@ impl Owner {
 	/// Error occurse if failed to connect to database or Owner (User) doesn't exist
 	///
 	/// # Example
-	/// ```rust,no_run
+	/// ```ignore
 	/// let owner = Owner::get_owner(msg.owner_id, &conn).map_err(|x| return x);
 	/// assert!(owner.is_ok())
 	/// ```
