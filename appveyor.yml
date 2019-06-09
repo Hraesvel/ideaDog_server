@@ -65,7 +65,7 @@ deploy:
   # - Paste the output down here
   auth_token:
     secure: sWV9RcbYkm+cdpQ3XhSItHNHUrB5WumIJpQZYzgqUeGKlFFqeZpx3b/rTDw6YHQi
-  description: 'Delpoyment for ideaDog server'
+  description: 'Delpoyment for ideaDog-server_$(appveyor_repo_tag_name)'
   on:
     # TODO Here you can pick which targets will generate binary releases
     # In this example, there are some targets that are tested using the stable
@@ -74,6 +74,7 @@ deploy:
     RUST_VERSION: stable
     appveyor_repo_tag: true
   provider: GitHub
+  tag: $(APPVEYOR_REPO_TAG_NAME)
 
 cache:
   - C:\Users\appveyor\.cargo\registry
