@@ -83,6 +83,7 @@ fn main() {
 	        .resource("/", |r| r.f(greatings))
 	        .configure(views::ideas::config)
 	        .configure(views::tags::config)
+	        .configure(views::users::config)
 	        .finish()
     })
         .bind(hostname.clone())

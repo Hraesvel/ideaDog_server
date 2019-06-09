@@ -1,13 +1,15 @@
 use chrono::Utc;
 use chrono::DateTime;
 
-#[derive(Serialize, Deserialize)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct User {
-	#[serde(aliea = "_key")]
+	#[serde(alias = "_key")]
 	pub key: String,
-	#[serde(aliea = "_id")]
+	#[serde(alias = "_id")]
 	pub id: String,
-	#[serde(aliea = "name")]
+	#[serde(alias = "name")]
 	pub username: String,
 	pub email: String,
 	//	pub date: DateTime<Utc>,
@@ -15,14 +17,16 @@ pub struct User {
 	pub active: bool,
 }
 
+#[derive(Debug)]
 pub struct QueryUser {
 	// get user by id only an active user
-	id: Option<String>,
+	pub id: Option<String>,
 	// if None all users,
 	// if Some(true) should only active users and if Some(false) show inactive users
-	active: Option<bool>,
+	pub active: Option<bool>,
 }
 
+#[derive(Debug)]
 pub struct NewUser {
 	pub username: String,
 	pub email: String,
