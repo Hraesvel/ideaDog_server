@@ -87,7 +87,7 @@ branches:
     - master
 
 notifications:
-  - provider: mcodesmith@gmail.com
+  - provider: email
     on_build_success: success
 
 # Building is done in the test phase, so we disable Appveyor's build phase.
