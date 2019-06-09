@@ -29,7 +29,7 @@ fn run_query(qufig: QueryTag, state: State<AppState>) -> FutureResponse<HttpResp
 		.send(qufig)
 		.from_err()
 		.and_then(|res| match res {
-			Ok(ideas) => Ok(HttpResponse::Ok().json(ideas)),
+			Ok(value) => Ok(HttpResponse::Ok().json(value)),
 			Err(_) => Ok(HttpResponse::InternalServerError().into()),
 		})
 		.responder()
@@ -54,6 +54,5 @@ fn get_one_tag((path, state): (Path<String>, State<AppState>)) -> FutureResponse
 fn get_associations((path, state): (Path<String>, State<AppState>)) -> FutureResponse<HttpResponse> {
 	let vec_of_tags: Vec<String> = path.into_inner().split(',').map(|x| x.to_string()).collect();
 	let q_tags = QueryTag { id: Some(vec_of_tags), with_ideas: true, sort: Sort::ALL };
-	dbg!(&q_tags);
 	run_query(q_tags, state)
 }

@@ -3,10 +3,10 @@ use crate::models::{Sort, Idea};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Tag {
-	//	#[serde(alias = "key")]
-	pub _key: String,
-	//	#[serde(alias="id")]
-	pub _id: String,
+	#[serde(alias = "_key")]
+	pub key: String,
+	#[serde(alias = "_id")]
+	pub id: String,
 	#[serde(default)]
 	pub count: u64,
 	#[serde(default)]

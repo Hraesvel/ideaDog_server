@@ -53,14 +53,20 @@ fn run_query(qufigs: QueryIdea, state: State<AppState>) -> FutureResponse<HttpRe
 }
 
 fn get_ideas_sort(
-	(path, _q_string, state): (Path<String>, Query<Param>, State<AppState>),
+	(path, q_string, state): (Path<String>, Query<Param>, State<AppState>),
 ) -> FutureResponse<HttpResponse> {
+	let mut vec_of_tags = None;
+	if let Some(value) = &q_string.tags {
+		let v_string: Vec<String> = value.clone().split(',').map(|x| x.to_string()).collect();
+		vec_of_tags = Some(v_string);
+	};
+	
 	let mut q = QueryIdea {
 		sort: Sort::ALL,
 		id: None,
 		owner: None,
 		owner_id: None,
-		tags: None,
+		tags: vec_of_tags,
 		limit: None,
 	};
 
@@ -73,12 +79,20 @@ fn get_ideas_sort(
 }
 
 fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureResponse<HttpResponse> {
+	let mut vec_of_tags = None;
+	if let Some(value) = &q_string.tags {
+		let v_string: Vec<String> = value.clone().split(',').map(|x| x.to_string()).collect();
+		vec_of_tags = Some(v_string);
+	};
+
+	dbg!(&vec_of_tags);
+
 	let mut q = QueryIdea {
 		sort: Sort::ALL,
 		id: None,
 		owner: None,
 		owner_id: None,
-		tags: None,
+		tags: vec_of_tags,
 		limit: None,
 	};
 
@@ -104,7 +118,6 @@ fn get_idea_id((path, state): (Path<String>, State<AppState>)) -> FutureResponse
 }
 
 fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureResponse<HttpResponse> {
-	println!("new time");
 	let new = NewIdea {
 		text: idea.text.clone(),
 		owner_id: idea.owner_id.clone(),
