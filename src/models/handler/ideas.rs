@@ -92,9 +92,15 @@ impl Handler<NewIdea> for DbExecutor {
         let data = serde_json::to_value(&new_idea).unwrap();
 
         let query = format!(
-            "INSERT {data} INTO {collection} LET i = NEW RETURN i",
-            data = data,
-            collection = "ideas"
+	        "let tags = (for t in {data}.tags return Document('tags', t))
+            INSERT {data} INTO {collection} LET idea = NEW
+            RETURN FIRST (FOR tag IN tags
+            UPDATE tag WITH {{count : tag.count + 1}} IN tags
+            INSERT {{ _from: tag._id, _to: idea._id }} INTO tag_to_idea
+            RETURN idea)
+            ",
+	        data = data,
+	        collection = "ideas"
         );
 
         let aql = AqlQuery::new(&query).batch_size(1);

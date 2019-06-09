@@ -93,3 +93,4 @@ fn main() {
     println!("Starting http server: {}", hostname);
     let _ = ideadog_system.run();
 }
+
