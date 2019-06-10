@@ -75,7 +75,7 @@ impl Handler<NewIdea> for DbExecutor {
             #[serde(default)]
             pub downvotes: u32,
             pub tags: Vec<String>,
-            pub date: i64,
+//            pub date: i64,
         }
 
         let conn = self.0.get().unwrap();
@@ -86,14 +86,14 @@ impl Handler<NewIdea> for DbExecutor {
             owner: Owner::get_owner(msg.owner_id, &conn).expect("Fail to get owner details."),
             upvotes: 0,
             downvotes: 0,
-            date: Utc::now().timestamp_millis(),
+//            date: Utc::now().timestamp_millis(),
         };
 
         let data = serde_json::to_value(&new_idea).unwrap();
 
         let query = format!(
 	        "let tags = (for t in {data}.tags return Document('tags', t))
-            INSERT {data} INTO {collection} LET idea = NEW
+            INSERT MERGE({data}, {{date: DATE_NOW()}}) INTO {collection} LET idea = NEW
             RETURN FIRST (FOR tag IN tags
             UPDATE tag WITH {{count : tag.count + 1}} IN tags
             INSERT {{ _from: tag._id, _to: idea._id }} INTO tag_to_idea
