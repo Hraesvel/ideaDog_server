@@ -11,7 +11,7 @@ impl Handler<QueryTag> for DbExecutor {
 
 	fn handle(&mut self, msg: QueryTag, _ctx: &mut Self::Context) -> Self::Result {
 		let conn = self.0.get().unwrap();
-		let mut aql = AqlQuery::new("FOR tag IN tags RETURN tag").batch_size(1);
+		let mut aql = AqlQuery::new("FOR tag IN tags SORT tag RETURN tag").batch_size(1);
 
 		if msg.with_ideas && msg.id.is_some() {
 			aql = AqlQuery::new("for tag in @user_input
