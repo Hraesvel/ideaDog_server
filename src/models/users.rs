@@ -12,9 +12,12 @@ pub struct User {
 	#[serde(alias = "name")]
 	pub username: String,
 	pub email: String,
-	//	pub date: DateTime<Utc>,
 	pub ideas: Vec<String>,
 	pub active: bool,
+	pub favorite: String,
+	pub upvotes: u32,
+	pub downvotes: u32,
+	pub create_at: i64,
 }
 
 #[derive(Debug)]
@@ -26,9 +29,20 @@ pub struct QueryUser {
 	pub active: Option<bool>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Default, Clone)]
 pub struct NewUser {
 	pub username: String,
 	pub email: String,
+	#[serde(default)]
+	pub ideas: Vec<String>,
+	#[serde(default)]
+	pub active: bool,
+	#[serde(default)]
+	pub favorite: String,
+	#[serde(default)]
+	pub upvotes: u32,
+	#[serde(default)]
+	pub downvotes: u32,
+	pub create_at: i64,
 }
 
