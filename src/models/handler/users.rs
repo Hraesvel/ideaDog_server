@@ -18,7 +18,7 @@ impl Handler<QueryUser> for DbExecutor {
 		// TODO handle querying more then one user
 		let mut aql = AqlQuery::new("");
 
-		if let Some(key) = msg.id {
+		if let Some(key) = msg.token {
 			aql = AqlQuery::new("RETURN DOCUMENT('users', @ele)")
 				.bind_var("ele", key.clone())
 				.batch_size(1);

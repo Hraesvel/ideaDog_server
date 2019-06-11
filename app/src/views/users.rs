@@ -1,12 +1,14 @@
 use crate::{AppState};
 use actix_web::http::header::http_percent_encode;
 use actix_web::http::{Method, NormalizePath, StatusCode};
-use actix_web::{AsyncResponder, Responder, Path, Json};
+use actix_web::{AsyncResponder, Responder, Path, Json, HttpRequest};
 use actix_web::{App, FutureResponse, HttpResponse, Query, State};
-use futures::future::Future;
+use futures::future::{Future, IntoFuture};
 use ideadog::{Sort, User, NewUser, QueryUser};
 use serde::Deserialize;
 use chrono::Utc;
+use crate::midware::AuthMiddleware;
+use actix_web::client::head;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
 	cfg.scope("/user", |scope| {
@@ -15,14 +17,16 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
 				true,
 				true,
 				StatusCode::TEMPORARY_REDIRECT,
-			))
-		})
-		     .resource("/{id}", |r| {
-			r.method(Method::GET).with(get_user);
+			));
+			r.method(Method::POST).with(create_user);
 		})
 		     .resource("/", |r| {
-			     r.method(Method::POST).with(create_user);
-		     })
+			     r.middleware(AuthMiddleware);
+			     r.method(Method::GET).with(get_user);
+		})
+//		     .resource("/", |r| {
+//			     r.method(Method::POST).with(create_user);
+//		     })
 	})
 }
 
@@ -44,8 +48,15 @@ fn run_query(qufigs: QueryUser, state: State<AppState>) -> FutureResponse<HttpRe
 		.responder()
 }
 
-fn get_user((path, state): (Path<String>, State<AppState>)) -> FutureResponse<HttpResponse> {
-	let qufig = QueryUser { id: Some(path.into_inner()), active: None };
+fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> FutureResponse<HttpResponse> {
+	let token = req.headers().get("AUTHORIZATION").map(|value| value.to_str().ok())
+	               .ok_or(HttpResponse::Unauthorized().into());
+
+	if token.err() {
+		return token.into_future();
+	}
+
+	let qufig = QueryUser { token: token.clone() };
 	run_query(qufig, state)
 }
 

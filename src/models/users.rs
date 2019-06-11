@@ -22,11 +22,8 @@ pub struct User {
 
 #[derive(Debug)]
 pub struct QueryUser {
-	// get user by id only an active user
-	pub id: Option<String>,
-	// if None all users,
-	// if Some(true) should only active users and if Some(false) show inactive users
-	pub active: Option<bool>,
+	// find the token and then get the user it points to.
+	pub token: String,
 }
 
 #[derive(Debug, Serialize, Default, Clone)]
