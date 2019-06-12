@@ -13,26 +13,27 @@ use arangors::AqlQuery;
 use std::env;
 use serde::{Deserialize, Serialize};
 use failure::Error;
+use ideadog::{Challenge, Login, Signup};
 
-#[derive(Deserialize, Debug)]
-struct Login { email: String }
-
-#[derive(Deserialize, Debug)]
-struct Signup {
-	email: String,
-	username: String
-}
-
-#[derive(Serialize, Clone, Debug)]
-pub struct Challenge {
-	_id: String,
-	#[serde(alias = "_key")]
-	challenge: String,
-	email: String,
-	username: Option<String>,
-	pending: bool,
-	ttl: i64
-}
+//#[derive(Deserialize, Debug)]
+//struct Login { email: String }
+//
+//#[derive(Deserialize, Debug)]
+//struct Signup {
+//	pub email: String,
+//	pub username: String
+//}
+//
+//#[derive(Serialize, Clone, Debug)]
+//pub struct Challenge {
+//	pub _id: String,
+//	#[serde(alias = "_key")]
+//	pub challenge: String,
+//	pub email: String,
+//	pub username: Option<String>,
+//	pub pending: bool,
+//	pub ttl: i64
+//}
 
 pub fn config(cgf: App<AppState>) -> App<AppState> {
 	cgf.resource("/login", |r| {
@@ -98,54 +99,56 @@ fn exist_user(email: String, state: &State<AppState>) -> bool {
 	response.unwrap()
 }
 
-impl Message for Login {
-	type Result = Result<Vec<bool>, Error>;
-}
+//impl Message for Login {
+//	type Result = Result<Vec<bool>, Error>;
+//}
 
-impl Handler<Login> for DbExecutor {
-	type Result = Result<Vec<bool>, Error>;
-
-	fn handle(&mut self, msg: Login, ctx: &mut Self::Context) -> Self::Result {
-		let conn = self.0.get().unwrap();
-		let aql = AqlQuery::new(
-			"for u in users
-		filter u.email == @email
-		return IS_DOCUMENT(u)
-			")
-			.bind_var("email", msg.email.clone())
-			.batch_size(1);
-
-		let res = conn.aql_query(aql).unwrap();
-
-		Ok(res)
-	}
-}
-
-
-impl Message for Challenge {
-	type Result = Result<String, Error>;
-}
-
-impl Handler<Challenge> for DbExecutor {
-	type Result = Result<String, Error>;
-
-	fn handle(&mut self, msg: Challenge, ctx: &mut Self::Context) -> Self::Result {
-		let conn = self.0.get().unwrap();
-		let data = serde_json::to_value(msg).unwrap();
-
-		let aql = AqlQuery::new(
-			"INSERT @data INTO challenges
-			").bind_var("data", data)
-		      .batch_size(1);
-
-		let response = conn.aql_query(aql);
+//impl Handler<Login> for DbExecutor {
+//	type Result = Result<Vec<bool>, Error>;
+//
+//	fn handle(&mut self, msg: Login, ctx: &mut Self::Context) -> Self::Result {
+//		let conn = self.0.get().unwrap();
+//		let aql = AqlQuery::new(
+//			"for u in users
+//		filter u.email == @email
+//		return IS_DOCUMENT(u)
+//			")
+//			.bind_var("email", msg.email.clone())
+//			.batch_size(1);
+//
+//		let res = conn.aql_query(aql).unwrap();
+//
+//		Ok(res)
+//	}
+//}
 
 
-//		response
+//impl Message for Challenge {
+//	type Result = Result<String, Error>;
+//}
+//
+//impl Handler<Challenge> for DbExecutor {
+//	type Result = Result<String, Error>;
+//
+//	fn handle(&mut self, msg: Challenge, ctx: &mut Self::Context) -> Self::Result {
+//		let conn = self.0.get().unwrap();
+//		let data = serde_json::to_value(msg).unwrap();
+//
+//		let aql = AqlQuery::new(
+//			"INSERT @data INTO challenges
+//			").bind_var("data", data)
+//		      .batch_size(1);
+//
+//		let response = conn.aql_query(aql);
+//
+//
+////		response
+//
+//		Ok("woof".to_string())
+//	}
+//}
 
-		Ok("woof".to_string())
-	}
-}
+
 
 //fn send_magic_link(challenge: Challenge, state: State<AppState>) ->  Result<HttpResponse>{
 //	let client =

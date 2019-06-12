@@ -2,3 +2,4 @@
 mod ideas;
 mod users;
 mod tags;
+mod challenge;
