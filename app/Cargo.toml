@@ -20,6 +20,9 @@ dotenv = "0.14.1"
 toml = "0.5"
 chrono = "0.4.6"
 failure = "0.1.5"
+base64 = "0.10.1"
+rand = "0.6"
+approveapi = "1.0.3"
 
 #arangors = {path = "../../arangors"}
 #r2d2-arangodb = {path = "../../r2d2-arangodb"}

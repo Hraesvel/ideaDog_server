@@ -1,12 +1,12 @@
 use crate::AppState;
-use actix_web::client::get;
-use actix_web::http::header::http_percent_encode;
+
+
 use actix_web::http::Method;
-use actix_web::{AsyncResponder, Responder, Path};
+use actix_web::{AsyncResponder, Path};
 use actix_web::{App, FutureResponse, HttpResponse, Query, State};
 use futures::future::Future;
 use ideadog::{Tag, QueryTag, Sort};
-use serde::Deserialize;
+
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
 	cfg.scope("/tags", |scope|

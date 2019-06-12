@@ -80,10 +80,6 @@ pub struct NewIdea {
     pub tags: Vec<String>,
 }
 
-//noinspection RsExternalLinter
-fn temp_user() -> String {
-    format!("abc")
-}
 
 #[derive(Debug)]
 pub enum Sort {

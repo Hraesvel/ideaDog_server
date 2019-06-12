@@ -151,13 +151,13 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
 #[cfg(test)]
 mod test {
 	use crate::views::ideas::{create_idea, get_idea_id, get_ideas, get_ideas_sort};
-	use crate::{views, AppState};
+	use crate::{AppState};
 	use actix_web::actix::SyncArbiter;
-	use actix_web::http::{Method, NormalizePath};
+	use actix_web::http::{Method};
 	use actix_web::test::TestServer;
 	use ideadog::DbExecutor;
 	use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
-	use serde_json::error::Category::Syntax;
+
 	use std::env;
 
 	fn build_test_server() -> TestServer {

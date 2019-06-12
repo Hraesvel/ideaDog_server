@@ -1,6 +1,3 @@
-use chrono::Utc;
-use chrono::DateTime;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -23,7 +20,7 @@ pub struct User {
 #[derive(Debug)]
 pub struct QueryUser {
 	// find the token and then get the user it points to.
-	pub token: String,
+	pub token: Option<String>,
 }
 
 #[derive(Debug, Serialize, Default, Clone)]

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
 use crate::DbExecutor;
-use actix_web::http::header::q;
+
 
 fn filter_with(data: Vec<String>) -> String {
     let mut q_string = "FILTER ".to_string();

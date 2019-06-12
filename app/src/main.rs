@@ -90,6 +90,7 @@ fn main() {
 	        .configure(views::ideas::config)
 	        .configure(views::tags::config)
 	        .configure(views::users::config)
+	        .configure(views::auth::config)
 	        .finish()
     })
         .bind(hostname.clone())
