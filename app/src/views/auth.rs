@@ -1,5 +1,5 @@
 use rand;
-use approveapi::CreatePromptRequest;
+use approveapi::*;
 use actix_web::actix::{Handler, Message};
 use crate::{DbExecutor, AppState};
 use actix_web::{App, Result, Responder, Form, State, HttpResponse, HttpRequest, Json};
@@ -60,20 +60,23 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
 		ttl
 	};
 
-	dbg!(&challenge);
+//	dbg!(&challenge);
 
-//	let r = state
-//		.database
-//		// added challenge to database
-//		.send(challenge.clone())
-////		.from_err()
-//		.and_then(|res| {
-//			match res {
-////				Ok(_) => send_magic_link(challenge, state),
+	let r = state
+		.database
+		// added challenge to database
+		.send(challenge.clone())
+		.from_err()
+		.and_then(|res| {
+			match res {
+				Ok(_) => send_magic_link(challenge, state),
 //				Ok(_) => Ok("We got a challenger!".to_string()),
-//				Err(_) => Ok("bad joo joo!".to_string()),
-//			}
-//		}).wait();
+				Err(_) => Ok(HttpResponse::Unauthorized().finish()),
+			}
+		}).wait();
+
+
+	dbg!(r);
 
 
 	HttpResponse::build(StatusCode::OK)
@@ -149,44 +152,45 @@ fn exist_user(email: String, state: &State<AppState>) -> bool {
 //}
 
 
+fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpResponse> {
+	let client =
+		approveapi::create_client(env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"));
 
-//fn send_magic_link(challenge: Challenge, state: State<AppState>) ->  Result<HttpResponse>{
-//	let client =
-//		approveapi::create_client(env::var("APPROVEAPI_TEST_KEY")).unwrap();
-//
-//	let mut prompt_request = CreatePromptRequest::new(
-//		challenge.email.clone(),
-//		r#"Click the link below to Sign in to your account.
-//		This link will expire in 15 mintues."#
-//			.to_string()
-//	);
-//	prompt_request.title = Some("Magic sign-in link".to_string());
-//	prompt_request.approve_text = Some("Accept".to_string());
-//	prompt_request.reject_text = Some("Reject".to_string());
-//	prompt_request.long_poll = Some(true);
-//
-//	match client.create_prompt(prompt_request).sync() {
-//		Ok(prompt) => {
-//			if let Some(answer) = prompt.answer {
-//				if answer.result {
+	let mut prompt_request = CreatePromptRequest::new(
+		challenge.email.clone(),
+		r#"Click the link below to Sign in to your account.
+		This link will expire in 15 mintues."#
+			.to_string()
+	);
+	prompt_request.title = Some("Magic sign-in link".to_string());
+	prompt_request.approve_text = Some("Accept".to_string());
+	prompt_request.reject_text = Some("Reject".to_string());
+	prompt_request.long_poll = Some(true);
+
+	match client.create_prompt(prompt_request).sync() {
+		Ok(prompt) => {
+			if let Some(answer) = prompt.answer {
+				if answer.result {
+					println!("welcome to ideaDog!");
+					return Ok(HttpResponse::build(StatusCode::OK).finish())
 //					return set_login(challenge.challenge, state);
-//				} else {
-//					println!("Request Rejected");
-//					return Ok(HttpResponse::build(StatusCode::UNAUTHORIZED)
-//						.finish())
-//				}
-//			} else {
-//				println!("No response from user");
-//				return Ok(HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
-//					.finish());
-//			}
-//		},
-//		Err(e) => {
-//			println!("ApproveAPI->create_prompt error: {:?}", e);
-//			return Ok(HttpResponse::build(StatusCode::BAD_REQUEST).finish())
-//		}
-//	}
-//}
+				} else {
+					println!("Request Rejected");
+					return Ok(HttpResponse::build(StatusCode::UNAUTHORIZED)
+						.finish())
+				}
+			} else {
+				println!("No response from user");
+				return Ok(HttpResponse::build(StatusCode::TEMPORARY_REDIRECT)
+					.finish());
+			}
+		},
+		Err(e) => {
+			println!("ApproveAPI->create_prompt error: {:?}", e);
+			return Ok(HttpResponse::build(StatusCode::BAD_REQUEST).finish())
+		}
+	}
+}
 
 //fn set_login(challenge: String, state: State<AppState> ) -> Result<HttpResponse>{
 //	state

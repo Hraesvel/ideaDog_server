@@ -14,6 +14,7 @@ pub struct Signup {
 pub struct Challenge {
 	pub _id: String,
 	#[serde(alias = "_key")]
+	#[serde(rename(serialize = "_key"))]
 	pub challenge: String,
 	pub email: String,
 	pub username: Option<String>,

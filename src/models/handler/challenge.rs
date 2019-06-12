@@ -13,7 +13,7 @@ impl Handler<Login> for DbExecutor {
 		let conn = self.0.get().unwrap();
 		let aql = AqlQuery::new(
 			"for u in users
-		filter u.email == @emai
+		filter u.email == @email
 		return IS_DOCUMENT(u)
 			")
 			.bind_var("email", msg.email.clone())
