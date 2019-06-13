@@ -8,6 +8,7 @@ type Connection = PooledConnection<ArangodbConnectionManager>;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Owner {
+	#[serde(alias = "_key")]
     pub id: String,
 	#[serde(alias = "name")]
 	pub username: String,
