@@ -14,6 +14,7 @@ use std::env;
 use serde::{Deserialize, Serialize};
 use failure::Error;
 use ideadog::{Challenge, Login, Signup};
+use serde_json;
 
 //#[derive(Deserialize, Debug)]
 //struct Login { email: String }
@@ -41,6 +42,11 @@ pub fn config(cgf: App<AppState>) -> App<AppState> {
 	})
 }
 
+fn ttl(mins: i64) -> i64 {
+	let ttl = (mins * 60000) + Utc::now().timestamp_millis();
+	ttl
+}
+
 fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
 	// check if user via email exists.
 	if !exist_user(form.email.clone(), &state) {
@@ -49,8 +55,8 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
 	}
 
 	// create ttl with a 15 min offset
-	let ttl = (15 * 60000) + Utc::now().timestamp_millis();
-	let c = challenge();
+	let ttl = ttl(15);
+	let c = challenge(32);
 	let challenge = Challenge {
 		_id: format!("challenges/{}", c.clone()),
 		challenge: c,
@@ -59,8 +65,6 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
 		pending: true,
 		ttl
 	};
-
-//	dbg!(&challenge);
 
 	let r = state
 		.database
@@ -75,17 +79,13 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
 			}
 		}).wait();
 
-
-	dbg!(r);
-
-
 	HttpResponse::build(StatusCode::OK)
 		.content_type("text/html; charset")
 		.body("Something is happening!")
 }
 
-fn challenge() -> String {
-	let mut nonce = vec![0u8; 32];
+fn challenge(size: usize) -> String {
+	let mut nonce = vec![0u8; size];
 	OsRng::new().unwrap().fill_bytes(&mut nonce);
 	base64::encode_config(&nonce, base64::URL_SAFE)
 }
@@ -172,8 +172,8 @@ fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpR
 			if let Some(answer) = prompt.answer {
 				if answer.result {
 					println!("welcome to ideaDog!");
-					return Ok(HttpResponse::build(StatusCode::OK).finish())
-//					return set_login(challenge.challenge, state);
+//					return Ok(HttpResponse::build(StatusCode::OK).finish());
+					return set_login(challenge.challenge, state);
 				} else {
 					println!("Request Rejected");
 					return Ok(HttpResponse::build(StatusCode::UNAUTHORIZED)
@@ -192,42 +192,88 @@ fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpR
 	}
 }
 
-//fn set_login(challenge: String, state: State<AppState> ) -> Result<HttpResponse>{
-//	state
-//		.database
-//		.send(Pending(challenge))
-//}
+fn set_login(challenge: String, state: State<AppState>) -> Result<HttpResponse> {
+	let res = state
+		.database
+		.send(Pending(challenge))
+		.from_err()
+		.and_then(|res| match res {
+			Ok(v) => Ok(HttpResponse::Ok()
+				.content_type("text/html; charset=utf-8")
+				.body("bears are coming")),
 
-//struct Pending(String);
-//
-//impl Message for Pending {
-//	type Result = Result<String, ()>;
-//}
-//
-//impl Handler<Pending> for DbExecutor {
-//	type Result = Result<String, ()>;
-//
-//	fn handle(&mut self, msg: Pending, ctx: &mut Self::Context) -> Self::Result {
-//		let conn = self.0.get().unwrap();
-//
-//		let aql = AqlQuery::new(
-//			"FOR c IN challenges \
-//			FILTER c._key == @challenge
-//			RETURN c
-//		").bind_var("challenge", msg.0.clone())
-//			.batch_size(1);
-//
-//		let bearer = challenge();
-//
-//		let challenge : Challenge = match conn.aql_query(aql) {
-//			Ok(r) if !r.is_empty() => r[0].clone(),
-//			_ => vec![]
-//		};
-//
-//		if challenge.pending == true && challenge.ttl < Utc::now().timestamp_millis() {
-//			let aql = AqlQuery::new("")
-//		}
-//
-//		Ok(format!("woof"))
-//	}
-//}
+			_ => Ok(HttpResponse::BadRequest()
+				.content_type("text/html; charset=utf-8")
+				.body("bad show my boy")),
+		}).wait();
+
+	res
+}
+
+struct Pending(String);
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Bearer {
+	#[serde(alias = "_key")]
+	#[serde(rename(serialize = "_key"))]
+	pub token: String,
+	pub ttl: i64
+}
+
+impl Message for Pending {
+	type Result = Result<Option<Bearer>, Error>;
+}
+
+impl Handler<Pending> for DbExecutor {
+	type Result = Result<Option<Bearer>, Error>;
+
+	fn handle(&mut self, msg: Pending, ctx: &mut Self::Context) -> Self::Result {
+		let conn = self.0.get().unwrap();
+
+		let bearer = Bearer {
+			token: challenge(64),
+			ttl: ttl(43800),
+		};
+
+		let aql = AqlQuery::new(
+			"FOR c IN challenges \
+			FILTER c._key == @challenge
+			RETURN c
+		").bind_var("challenge", msg.0.clone())
+		  .batch_size(1);
+
+		let mut challenge: Vec<Challenge> = match &conn.aql_query(aql) {
+			Ok(r) if !r.is_empty() => r.clone(),
+			_ => vec![]
+		};
+
+		let challenge = dbg!(challenge.pop().unwrap());
+
+		let mut aql = AqlQuery::new("RETURN {_key: 'false', ttl: 0}");
+		if challenge.pending == true && challenge.ttl > Utc::now().timestamp_millis() {
+			aql = AqlQuery::new("
+			LET usr = FIRST (FOR u IN users FILTER u.email == @email RETURN u)
+			INSERT @data INTO bearer_tokens let t = NEW
+			INSERT {_from: t._id, _to: usr._id} INTO bearer_to_user LET b = NEW
+			RETURN t"
+			)
+				.bind_var("email", challenge.email)
+				.bind_var("data", serde_json::to_value(bearer).unwrap())
+				.batch_size(1);
+		};
+
+		let mut r: Vec<Bearer> = match &conn.aql_query(aql) {
+			Ok(r) if !r.is_empty() => r.clone(),
+			_ => vec!()
+		};
+
+		dbg!(&r);
+
+		let response = Some(r.pop().unwrap());
+
+		Ok(response)
+
+//		Ok(None)
+	}
+}
+
