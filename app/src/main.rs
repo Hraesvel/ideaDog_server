@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate failure;
 use actix_web::actix::{Addr, SyncArbiter};
 use actix_web::http::{header, NormalizePath, StatusCode};
 use actix_web::middleware::cors::Cors;
@@ -9,7 +11,9 @@ use r2d2;
 use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
 use std::env;
 
+use midware::AuthMiddleware;
 //routes
+mod midware;
 mod views;
 //mod ideas;
 
@@ -67,10 +71,17 @@ fn main() {
 
     server::new(move || {
         let cors = Cors::build()
-            .send_wildcard()
-            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
-            .allowed_header(header::CONTENT_TYPE)
-            .finish();
+	        //            .send_wildcard()
+	        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+	        .allowed_headers(vec![
+		        header::CONTENT_TYPE,
+		        header::AUTHORIZATION,
+		        header::ACCEPT,
+		        header::ORIGIN,
+	        ])
+	        .supports_credentials()
+	        .max_age(3600)
+	        .finish();
 
         App::with_state(AppState {
             database: addr.clone(),
@@ -83,14 +94,15 @@ fn main() {
 	        .resource("/", |r| r.f(greatings))
 	        .configure(views::ideas::config)
 	        .configure(views::tags::config)
+	        .configure(views::users::config)
+	        .configure(views::auth::config)
 	        .finish()
     })
-        .bind(hostname.clone())
-        .unwrap()
-        .workers(2)
-        .start();
+	    .bind(hostname.clone())
+	    .unwrap()
+	    .workers(2)
+	    .start();
 
     println!("Starting http server: {}", hostname);
     let _ = ideadog_system.run();
 }
-

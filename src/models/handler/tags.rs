@@ -14,7 +14,8 @@ impl Handler<QueryTag> for DbExecutor {
 		let mut aql = AqlQuery::new("FOR tag IN tags SORT tag RETURN tag").batch_size(1);
 
 		if msg.with_ideas && msg.id.is_some() {
-			aql = AqlQuery::new("for tag in @user_input
+			aql = AqlQuery::new(
+				"for tag in @user_input
 			let t = DOCUMENT(CONCAT('tags/', tag))
 			RETURN {
                 _key: t._key,
@@ -24,9 +25,10 @@ impl Handler<QueryTag> for DbExecutor {
                     for v in 1..1 OUTBOUND t._id tag_to_idea
                     RETURN v
                     )
-				}"
-			).bind_var("user_input", msg.id.unwrap().clone())
-			 .batch_size(50);
+				}",
+			)
+				.bind_var("user_input", msg.id.unwrap().clone())
+				.batch_size(50);
 		} else {
 			if let Some(key) = msg.id {
 				aql = AqlQuery::new("RETURN DOCUMENT(CONCAT('tags/', @key))")
@@ -42,7 +44,7 @@ impl Handler<QueryTag> for DbExecutor {
 				vec![]
 			}
 		};
-//		dbg!(&response);
+		//		dbg!(&response);
 		Ok(response)
 	}
 }

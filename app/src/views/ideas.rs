@@ -6,6 +6,7 @@ use actix_web::{AsyncResponder, Path};
 use futures;
 use futures::future::Future;
 use ideadog::{NewIdea, QueryIdea, Sort};
+use crate::AuthMiddleware;
 use serde::Deserialize;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
@@ -24,11 +25,12 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
 					   StatusCode::TEMPORARY_REDIRECT,
 				   ))
 			   })
-			   .resource("/", |r| r.method(Method::POST).with(create_idea))
-			   //            .resource("/", |r| r.method(Method::POST).with(create_idea))
+			   .resource("/", |r| {
+				   r.middleware(AuthMiddleware);
+				   r.method(Method::POST).with(create_idea);
+			   })
 			   .resource("/{id}/", |r| {
 				   r.method(Method::GET).with(get_idea_id);
-				   //                r.method(Method::POST).with(post_idea);
 			   })
 	   })
 }
@@ -91,8 +93,6 @@ fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureRespon
 		vec_of_tags = Some(v_string);
 	};
 
-	dbg!(&vec_of_tags);
-
 	let mut q = QueryIdea {
 		sort: Sort::ALL,
 		id: None,
@@ -151,13 +151,13 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
 #[cfg(test)]
 mod test {
 	use crate::views::ideas::{create_idea, get_idea_id, get_ideas, get_ideas_sort};
-	use crate::{views, AppState};
+	use crate::AppState;
 	use actix_web::actix::SyncArbiter;
-	use actix_web::http::{Method, NormalizePath};
+	use actix_web::http::Method;
 	use actix_web::test::TestServer;
 	use ideadog::DbExecutor;
 	use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
-	use serde_json::error::Category::Syntax;
+
 	use std::env;
 
 	fn build_test_server() -> TestServer {
@@ -203,7 +203,6 @@ mod test {
 					   r.method(Method::GET).with(get_idea_id);
 				   });
 			});
-
 
 		srv
 	}
