@@ -15,16 +15,23 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::env;
 use std::time::Duration;
+use crate::views::users::{create_user, SignUp};
 
 pub fn config(cgf: App<AppState>) -> App<AppState> {
     cgf.resource("/login", |r| {
         r.method(Method::POST).with(login);
-    })
+    }).resource("/signup", |r|{
+        r.method(Method::POST).with(create_user);
+    } )
 }
 
-fn ttl(mins: i64) -> i64 {
-    let ttl = (mins * 60000) + Utc::now().timestamp_millis();
-    ttl
+fn signup((form, state): (Json<Signup>, State<AppState>)) -> impl Responder {
+    if exist_user(form.email.clone(), &state) {
+        let response =  perform_approve_aip(form.email.clone(), state);
+        return response.unwrap();
+    }
+
+    HttpResponse::BadRequest().finish()
 }
 
 fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
@@ -33,13 +40,46 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
         return HttpResponse::build(StatusCode::TEMPORARY_REDIRECT).finish();
     }
 
+    perform_approve_aip(form.email.clone(), state).unwrap()
+
     // create ttl with a 15 min offset
+//    let ttl = ttl(15);
+//    let c = challenge_gen(32);
+//    let challenge = Challenge {
+//        _id: format!("challenges/{}", c.clone()),
+//        challenge: c,
+//        email: form.email.clone(),
+//        username: None,
+//        pending: true,
+//        ttl,
+//    };
+//
+//    let r = state
+//        .database
+//        // added challenge to database
+//        .send(challenge.clone())
+//        .from_err()
+//        .and_then(|res| match res {
+//            Ok(_) => send_magic_link(challenge, state),
+//            Err(_) => Ok(HttpResponse::Unauthorized().finish()),
+//        })
+//        .wait();
+//
+//    dbg!(r.unwrap())
+
+    //	HttpResponse::build(StatusCode::OK)
+    //		.content_type("text/html; charset")
+    //		.body("Something is happening!")
+}
+
+pub(crate) fn perform_approve_aip(form: String, state: State<AppState>) -> Result<HttpResponse> {
+
     let ttl = ttl(15);
     let c = challenge_gen(32);
     let challenge = Challenge {
         _id: format!("challenges/{}", c.clone()),
         challenge: c,
-        email: form.email.clone(),
+        email: form.clone(),
         username: None,
         pending: true,
         ttl,
@@ -56,11 +96,12 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
         })
         .wait();
 
-    dbg!(r.unwrap())
+    r
+}
 
-    //	HttpResponse::build(StatusCode::OK)
-    //		.content_type("text/html; charset")
-    //		.body("Something is happening!")
+fn ttl(mins: i64) -> i64 {
+    let ttl = (mins * 60000) + Utc::now().timestamp_millis();
+    ttl
 }
 
 fn challenge_gen(size: usize) -> String {
@@ -69,7 +110,7 @@ fn challenge_gen(size: usize) -> String {
     base64::encode_config(&nonce, base64::URL_SAFE)
 }
 
-fn exist_user(email: String, state: &State<AppState>) -> bool {
+pub(crate) fn exist_user(email: String, state: &State<AppState>) -> bool {
     let response = state
         .database
         .send(Login { email })
@@ -96,6 +137,7 @@ fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpR
     prompt_request.title = Some("Magic sign-in link".to_string());
     prompt_request.approve_text = Some("Accept".to_string());
     prompt_request.reject_text = Some("Reject".to_string());
+    prompt_request.expires_in = Some(900.0);
     prompt_request.long_poll = Some(true);
 
     match client.create_prompt(prompt_request).sync() {

@@ -1,17 +1,22 @@
 use crate::AppState;
 
 use crate::midware::AuthMiddleware;
+use crate::views::auth::{exist_user, perform_approve_aip};
 use actix_web::http::{Method, NormalizePath, StatusCode};
 use actix_web::{App, FutureResponse, HttpResponse, Responder, State};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use chrono::Utc;
-use futures::future::{Future, IntoFuture};
+use futures::future::{ok, Future, IntoFuture};
 use ideadog::{NewUser, QueryUser};
 use serde::Deserialize;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/user", |scope| {
         scope
+            .resource("/", |r| {
+                r.middleware(AuthMiddleware);
+                r.method(Method::GET).with(get_user);
+            })
             .default_resource(|r| {
                 r.h(NormalizePath::new(
                     true,
@@ -20,10 +25,6 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
                 ));
                 r.method(Method::POST).with(create_user);
             })
-            .resource("/", |r| {
-                r.middleware(AuthMiddleware);
-                r.method(Method::GET).with(get_user);
-            })
         //		     .resource("/", |r| {
         //			     r.method(Method::POST).with(create_user);
         //		     })
@@ -31,7 +32,7 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
 }
 
 #[derive(Deserialize, Debug)]
-struct SignUp {
+pub(crate) struct SignUp {
     pub username: String,
     pub email: String,
 }
@@ -71,7 +72,12 @@ fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Resp
     run_query(qufig, state)
 }
 
-fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> FutureResponse<HttpResponse> {
+pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> impl Responder {
+    if exist_user(json.email.clone(), &state) {
+        let response = perform_approve_aip(json.email.clone(), state);
+        return response;
+    };
+
     let new_user = NewUser {
         username: json.username.clone(),
         email: json.email.clone(),
@@ -80,7 +86,7 @@ fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> FutureResponse
         ..NewUser::default()
     };
 
-    state
+    let response = state
         .database
         .send(new_user)
         .from_err()
@@ -88,5 +94,6 @@ fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> FutureResponse
             Ok(ideas) => Ok(HttpResponse::Ok().json(ideas)),
             Err(_) => Ok(HttpResponse::InternalServerError().into()),
         })
-        .responder()
+        .wait();
+    response
 }
