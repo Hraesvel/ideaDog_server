@@ -14,7 +14,7 @@ pub struct User {
 	pub favorite: String,
 	pub upvotes: u32,
 	pub downvotes: u32,
-	pub create_at: i64,
+	pub created_at: i64,
 }
 
 #[derive(Debug)]
@@ -37,6 +37,5 @@ pub struct NewUser {
 	pub upvotes: u32,
 	#[serde(default)]
 	pub downvotes: u32,
-	pub create_at: i64,
+	pub created_at: i64,
 }
-

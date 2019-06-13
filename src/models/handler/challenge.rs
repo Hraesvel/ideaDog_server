@@ -1,10 +1,9 @@
 use crate::models::challenge::*;
-use failure::Error;
-use actix_web::actix::Handler;
 use crate::DbExecutor;
+use actix_web::actix::Handler;
 use arangors;
 use arangors::AqlQuery;
-
+use failure::Error;
 
 impl Handler<Login> for DbExecutor {
 	type Result = Result<Vec<bool>, Error>;
@@ -15,7 +14,8 @@ impl Handler<Login> for DbExecutor {
 			"for u in users
 		filter u.email == @email
 		return IS_DOCUMENT(u)
-			")
+			",
+		)
 			.bind_var("email", msg.email.clone())
 			.batch_size(1);
 
@@ -32,14 +32,16 @@ impl Handler<Challenge> for DbExecutor {
 		let conn = self.0.get().unwrap();
 		let data = serde_json::to_value(msg).unwrap();
 
-		let s = format!("INSERT {data} INTO challenges LET n = NEW RETURN n", data = data);
+		let s = format!(
+			"INSERT {data} INTO challenges LET n = NEW RETURN n",
+			data = data
+		);
 		let aql = AqlQuery::new(&s).batch_size(1);
 
 		let response: Option<Challenge> = match conn.aql_query(aql) {
 			Ok(mut r) => Some(r.pop().unwrap()),
-			Err(e) => None
+			Err(e) => None,
 		};
-
 
 		Ok(response.unwrap().challenge)
 	}

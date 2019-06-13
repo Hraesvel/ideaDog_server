@@ -9,10 +9,13 @@ use serde::{Deserialize, Serialize};
 use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
 use crate::DbExecutor;
 
-
 fn filter_with(data: Vec<String>) -> String {
     let mut q_string = "FILTER ".to_string();
-    let s = data.iter().map(|x| format!("'{}' IN ele.tags ", x)).collect::<Vec<String>>().join(" AND ");
+	let s = data
+		.iter()
+		.map(|x| format!("'{}' IN ele.tags ", x))
+		.collect::<Vec<String>>()
+		.join(" AND ");
 
     q_string.push_str(s.as_str());
     q_string
@@ -33,7 +36,9 @@ impl Handler<QueryIdea> for DbExecutor {
         // Handles Sort
         match &msg.sort {
             Sort::ALL => query.push_str("SORT ele.date DESC "),
-            Sort::BRIGHT => query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC "),
+	        Sort::BRIGHT => {
+		        query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
+	        }
         }
 
         dbg!(&query);

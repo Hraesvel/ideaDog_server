@@ -6,8 +6,7 @@ use r2d2::Error;
 
 use serde_json;
 
-use crate::{QueryUser, NewUser, User, DbExecutor};
-
+use crate::{DbExecutor, NewUser, QueryUser, User};
 
 impl Handler<QueryUser> for DbExecutor {
 	type Result = Result<Vec<User>, Error>;
@@ -18,7 +17,9 @@ impl Handler<QueryUser> for DbExecutor {
 		let mut aql = AqlQuery::new("");
 
 		if let Some(t) = msg.token {
-			let aql = AqlQuery::new("RETURN DOCUMENT('tokens', @ele)")
+			aql = AqlQuery::new(
+				"FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u",
+			)
 				.bind_var("ele", t.clone())
 				.batch_size(1);
 		}

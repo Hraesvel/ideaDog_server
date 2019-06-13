@@ -13,8 +13,8 @@ use std::env;
 
 use midware::AuthMiddleware;
 //routes
-mod views;
 mod midware;
+mod views;
 //mod ideas;
 
 pub struct AppState {
@@ -71,9 +71,14 @@ fn main() {
 
     server::new(move || {
         let cors = Cors::build()
-//            .send_wildcard()
+	        //            .send_wildcard()
 	        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
-	        .allowed_headers(vec![header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT, header::ORIGIN])
+	        .allowed_headers(vec![
+		        header::CONTENT_TYPE,
+		        header::AUTHORIZATION,
+		        header::ACCEPT,
+		        header::ORIGIN,
+	        ])
 	        .supports_credentials()
 	        .max_age(3600)
 	        .finish();
@@ -93,12 +98,11 @@ fn main() {
 	        .configure(views::auth::config)
 	        .finish()
     })
-        .bind(hostname.clone())
-        .unwrap()
-        .workers(2)
-        .start();
+	    .bind(hostname.clone())
+	    .unwrap()
+	    .workers(2)
+	    .start();
 
     println!("Starting http server: {}", hostname);
     let _ = ideadog_system.run();
 }
-

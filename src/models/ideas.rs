@@ -1,8 +1,8 @@
-use serde::Deserialize;
-use serde::Serialize;
 use arangors::AqlQuery;
 use r2d2::PooledConnection;
 use r2d2_arangodb::ArangodbConnectionManager;
+use serde::Deserialize;
+use serde::Serialize;
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
@@ -35,23 +35,25 @@ impl Owner {
 	        .bind_var("ident", ident)
 	        .batch_size(1);
 
-	    let owner = match conn.aql_query(aql) {
-		    Ok(mut r) => Some(r.pop().unwrap()),
-		    Err(e) => {println!("Error: {}",e); None},
-	    };
+		let owner = match conn.aql_query(aql) {
+			Ok(mut r) => Some(r.pop().unwrap()),
+			Err(e) => {
+				println!("Error: {}", e);
+				None
+			}
+		};
 
-	    owner
+		owner
     }
-
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Idea {
     // _id field from arangodb
-    #[serde(alias="_id")]
+    #[serde(alias = "_id")]
     pub id: String,
     // _key field from arangodb
-    #[serde(alias="_key")]
+    #[serde(alias = "_key")]
     pub key: String,
     // title of the idea
     pub text: String,
@@ -73,13 +75,12 @@ pub struct Idea {
 pub struct NewIdea {
     // title of the idea
     pub text: String,
-//    #[serde(default="temp_user")]
+	//    #[serde(default="temp_user")]
     // Owner's username
     pub owner_id: String,
 
     pub tags: Vec<String>,
 }
-
 
 #[derive(Debug)]
 pub enum Sort {

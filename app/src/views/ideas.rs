@@ -151,9 +151,9 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
 #[cfg(test)]
 mod test {
 	use crate::views::ideas::{create_idea, get_idea_id, get_ideas, get_ideas_sort};
-	use crate::{AppState};
+	use crate::AppState;
 	use actix_web::actix::SyncArbiter;
-	use actix_web::http::{Method};
+	use actix_web::http::Method;
 	use actix_web::test::TestServer;
 	use ideadog::DbExecutor;
 	use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
@@ -203,7 +203,6 @@ mod test {
 					   r.method(Method::GET).with(get_idea_id);
 				   });
 			});
-
 
 		srv
 	}

@@ -2,7 +2,7 @@ use crate::AppState;
 
 use crate::midware::AuthMiddleware;
 use actix_web::http::{Method, NormalizePath, StatusCode};
-use actix_web::{App, FutureResponse, HttpResponse, State};
+use actix_web::{App, FutureResponse, HttpResponse, Responder, State};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use chrono::Utc;
 use futures::future::{Future, IntoFuture};
@@ -48,21 +48,25 @@ fn run_query(qufigs: QueryUser, state: State<AppState>) -> FutureResponse<HttpRe
         .responder()
 }
 
-fn get_user(
-    (req, state): (HttpRequest<AppState>, State<AppState>),
-) -> FutureResponse<HttpResponse> {
+fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Responder {
     let tok = req
         .headers()
         .get("AUTHORIZATION")
         .map(|value| value.to_str().ok())
         .unwrap();
+    //    dbg!(tok);
 
-    let token = if let Some(v) = tok {
-        Some(v.to_string())
-    } else {
-        None
-    };
-    let qufig = QueryUser { token };
+    let mut token = tok
+        .unwrap()
+        .split(" ")
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>()
+        .pop()
+        .unwrap();
+
+    //    HttpResponse::Ok().finish();
+
+    let qufig = QueryUser { token: Some(token) };
 
     run_query(qufig, state)
 }
@@ -71,7 +75,7 @@ fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> FutureResponse
     let new_user = NewUser {
         username: json.username.clone(),
         email: json.email.clone(),
-        create_at: Utc::now().timestamp_millis(),
+        created_at: Utc::now().timestamp_millis(),
         active: false,
         ..NewUser::default()
     };

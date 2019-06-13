@@ -1,14 +1,15 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug)]
-pub struct Login { pub email: String }
+pub struct Login {
+	pub email: String,
+}
 
 #[derive(Deserialize, Debug)]
 pub struct Signup {
 	pub email: String,
-	pub username: String
+	pub username: String,
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Challenge {
@@ -19,5 +20,5 @@ pub struct Challenge {
 	pub email: String,
 	pub username: Option<String>,
 	pub pending: bool,
-	pub ttl: i64
+	pub ttl: i64,
 }

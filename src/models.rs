@@ -1,12 +1,11 @@
-pub use self::ideas::{Idea, NewIdea, QueryIdea, Sort, Owner};
-pub use self::users::{User, NewUser, QueryUser};
-pub use self::tags::{Tag, QueryTag};
 pub use self::challenge::*;
+pub use self::ideas::{Idea, NewIdea, Owner, QueryIdea, Sort};
+pub use self::tags::{QueryTag, Tag};
+pub use self::users::{NewUser, QueryUser, User};
 
-
-mod handler;
-mod message;
-mod ideas;
-mod users;
-mod tags;
 mod challenge;
+mod handler;
+mod ideas;
+mod message;
+mod tags;
+mod users;
