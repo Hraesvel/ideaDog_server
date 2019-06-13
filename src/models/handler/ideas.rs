@@ -41,7 +41,6 @@ impl Handler<QueryIdea> for DbExecutor {
 	        }
         }
 
-        dbg!(&query);
         query.push_str("RETURN ele");
 
 	    let mut aql = AqlQuery::new(&query).batch_size(25);

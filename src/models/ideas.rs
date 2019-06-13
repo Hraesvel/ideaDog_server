@@ -6,16 +6,11 @@ use serde::Serialize;
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Owner {
-    // _id field from arangodb
-    #[serde(alias = "_id")]
     pub id: String,
-    // _key field from arangodb
-    #[serde(alias = "_key", default)]
-    pub key: String,
-    //Owner's Username
-    pub name: String,
+	#[serde(alias = "name")]
+	pub username: String,
 }
 
 impl Owner {
@@ -59,6 +54,7 @@ pub struct Idea {
     pub text: String,
     // description of idea
     // Owner's username
+//    #[serde(skip)]
     pub owner: Owner,
     // This field is for the votes.
     #[serde(default)]

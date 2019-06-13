@@ -6,6 +6,7 @@ use actix_web::{AsyncResponder, Path};
 use futures;
 use futures::future::Future;
 use ideadog::{NewIdea, QueryIdea, Sort};
+use crate::AuthMiddleware;
 use serde::Deserialize;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
@@ -24,11 +25,12 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
 					   StatusCode::TEMPORARY_REDIRECT,
 				   ))
 			   })
-			   .resource("/", |r| r.method(Method::POST).with(create_idea))
-			   //            .resource("/", |r| r.method(Method::POST).with(create_idea))
+			   .resource("/", |r| {
+				   r.middleware(AuthMiddleware);
+				   r.method(Method::POST).with(create_idea);
+			   })
 			   .resource("/{id}/", |r| {
 				   r.method(Method::GET).with(get_idea_id);
-				   //                r.method(Method::POST).with(post_idea);
 			   })
 	   })
 }
@@ -90,8 +92,6 @@ fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureRespon
 		let v_string: Vec<String> = value.clone().split(',').map(|x| x.to_string()).collect();
 		vec_of_tags = Some(v_string);
 	};
-
-	dbg!(&vec_of_tags);
 
 	let mut q = QueryIdea {
 		sort: Sort::ALL,
