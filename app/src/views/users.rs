@@ -3,12 +3,15 @@ use crate::AppState;
 use crate::midware::AuthMiddleware;
 use crate::views::auth::{exist_user, perform_approve_aip};
 use actix_web::http::{Method, NormalizePath, StatusCode};
-use actix_web::{App, FutureResponse, HttpResponse, Responder, State};
+use actix_web::actix::{Message, Handler};
+use actix_web::{App, FutureResponse, HttpResponse, Responder, State, Path};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use chrono::Utc;
 use futures::future::{ok, Future, IntoFuture};
-use ideadog::{NewUser, QueryUser};
+use ideadog::{NewUser, QueryUser, DbExecutor, Idea};
 use serde::Deserialize;
+use r2d2::Error;
+use arangors::AqlQuery;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/user", |scope| {
@@ -24,6 +27,9 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
                     StatusCode::TEMPORARY_REDIRECT,
                 ));
                 r.method(Method::POST).with(create_user);
+            })
+            .resource("/{id}/ideas", |r|{
+                r.method(Method::GET).with(get_user_ideas);
             })
         //		     .resource("/", |r| {
         //			     r.method(Method::POST).with(create_user);
@@ -48,6 +54,45 @@ fn run_query(qufigs: QueryUser, state: State<AppState>) -> FutureResponse<HttpRe
         })
         .responder()
 }
+
+#[derive(Deserialize, Debug)]
+struct UIdeas(String);
+
+fn get_user_ideas((path,state): (Path<String>, State<AppState>)) -> FutureResponse<HttpResponse> {
+    state
+        .database
+        .send(UIdeas(path.into_inner().clone()))
+        .from_err()
+        .and_then( |res| match res {
+            Ok(r) => Ok(HttpResponse::Ok().json(r)),
+            Err(_) => Ok(HttpResponse::InternalServerError().into()),
+        }).responder()
+}
+
+impl Message for UIdeas {
+    type Result = Result<Vec<Idea>, Error>;
+}
+
+impl Handler<UIdeas> for DbExecutor {
+    type Result = Result<Vec<Idea>, Error>;
+
+    fn handle(&mut self, msg: UIdeas, ctx: &mut Self::Context) -> Self::Result {
+        let conn = self.0.get().unwrap();
+
+        let aql = AqlQuery::new(
+            "FOR i in 1..1 INBOUND CONCAT('users/', @id ) idea_owner
+        return i").bind_var("id", msg.0)
+                  .batch_size(25);
+
+        let response: Vec<Idea>  = match conn.aql_query(aql) {
+            Ok(r) => r,
+            Err(_) => vec![]
+        };
+
+        Ok(response)
+    }
+}
+
 
 fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Responder {
     let tok = req
