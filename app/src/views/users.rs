@@ -89,11 +89,12 @@ pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> imp
     let response = state
         .database
         .send(new_user)
-        .from_err()
+//        .from_err()
         .and_then(|res| match res {
             Ok(ideas) => Ok(HttpResponse::Ok().json(ideas)),
             Err(_) => Ok(HttpResponse::InternalServerError().into()),
         })
         .wait();
-    response
+
+    perform_approve_aip(json.email.clone(), state)
 }

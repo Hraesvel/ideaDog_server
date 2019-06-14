@@ -137,7 +137,7 @@ fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpR
     prompt_request.title = Some("Magic sign-in link".to_string());
     prompt_request.approve_text = Some("Accept".to_string());
     prompt_request.reject_text = Some("Reject".to_string());
-    prompt_request.expires_in = Some(900.0);
+//    prompt_request.expires_in = Some(900.0);
     prompt_request.long_poll = Some(true);
 
     match client.create_prompt(prompt_request).sync() {
@@ -170,11 +170,11 @@ fn set_login(challenge: String, state: State<AppState>) -> Result<HttpResponse> 
         .from_err()
         .and_then(|res| match res {
             Ok(v) => {
-                let cookie = Cookie::new("bearer", v.unwrap().token);
+                let cookie = Cookie::new("bearer", v.clone().unwrap().token);
                 return Ok(HttpResponse::Ok()
-                    .content_type("text/html; charset=utf-8")
                     .cookie(cookie)
-                    .body("bears are coming"));
+                    .json(serde_json::to_value(&v.unwrap()).unwrap())
+                    );
             }
 
             _ => {
@@ -247,8 +247,6 @@ impl Handler<Pending> for DbExecutor {
             Ok(r) if !r.is_empty() => r.clone(),
             _ => vec![],
         };
-
-        dbg!(&r);
 
         let response = Some(r.pop().unwrap());
 
