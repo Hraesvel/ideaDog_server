@@ -15,16 +15,24 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::env;
 use std::time::Duration;
+use crate::views::users::{create_user, SignUp};
 
+/// Configs for the auth routes.
 pub fn config(cgf: App<AppState>) -> App<AppState> {
     cgf.resource("/login", |r| {
         r.method(Method::POST).with(login);
-    })
+    }).resource("/signup", |r|{
+        r.method(Method::POST).with(create_user);
+    } )
 }
 
-fn ttl(mins: i64) -> i64 {
-    let ttl = (mins * 60000) + Utc::now().timestamp_millis();
-    ttl
+fn signup((form, state): (Json<Signup>, State<AppState>)) -> impl Responder {
+    if exist_user(form.email.clone(), &state) {
+        let response =  perform_approve_aip(form.email.clone(), state);
+        return response.unwrap();
+    }
+
+    HttpResponse::BadRequest().finish()
 }
 
 fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
@@ -33,13 +41,20 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
         return HttpResponse::build(StatusCode::TEMPORARY_REDIRECT).finish();
     }
 
-    // create ttl with a 15 min offset
+    perform_approve_aip(form.email.clone(), state).unwrap()
+
+}
+
+/// performs the step to generate a ApproveAPI prompt.
+#[deprecated]
+pub(crate) fn perform_approve_aip(form: String, state: State<AppState>) -> Result<HttpResponse> {
+
     let ttl = ttl(15);
     let c = challenge_gen(32);
     let challenge = Challenge {
         _id: format!("challenges/{}", c.clone()),
         challenge: c,
-        email: form.email.clone(),
+        email: form.clone(),
         username: None,
         pending: true,
         ttl,
@@ -56,20 +71,29 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
         })
         .wait();
 
-    dbg!(r.unwrap())
-
-    //	HttpResponse::build(StatusCode::OK)
-    //		.content_type("text/html; charset")
-    //		.body("Something is happening!")
+    r
 }
 
+/// Generates a UTC timestamp in milliseconds +/- mins given.
+fn ttl(mins: i64) -> i64 {
+    let ttl = (mins * 60000) + Utc::now().timestamp_millis();
+    ttl
+}
+
+/// Generate a `String` token of a given size
+///
+/// # Note
+/// recommendation anything above 32 bytes
+///
 fn challenge_gen(size: usize) -> String {
     let mut nonce = vec![0u8; size];
     OsRng::new().unwrap().fill_bytes(&mut nonce);
     base64::encode_config(&nonce, base64::URL_SAFE)
 }
 
-fn exist_user(email: String, state: &State<AppState>) -> bool {
+// TODO: swap out bool for an RESULT type
+/// Check is a user (by email) exists in the Database registry
+pub(crate) fn exist_user(email: String, state: &State<AppState>) -> bool {
     let response = state
         .database
         .send(Login { email })
@@ -82,6 +106,13 @@ fn exist_user(email: String, state: &State<AppState>) -> bool {
     response.unwrap()
 }
 
+// TODO: Converting this simple send a magic-link email, REALTIME prompts will be handled by front-end.
+/// This Function will send a magic link to the user's email provided at login/signup.
+///
+/// # Note
+/// This function will unlikely be use in production and is purely for demo purposes if the front-end isn't acceptable
+///
+///
 fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpResponse> {
     let client = approveapi::create_client(
         env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"),
@@ -96,8 +127,11 @@ fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpR
     prompt_request.title = Some("Magic sign-in link".to_string());
     prompt_request.approve_text = Some("Accept".to_string());
     prompt_request.reject_text = Some("Reject".to_string());
+//    TODO: Realtime approval will be handled but the front-end.
+//    prompt_request.reject_redirect_url = Some(env::var("REDIRECT_URL").expect("IDEADOG_HOME must be set"));
     prompt_request.long_poll = Some(true);
 
+	// TODO: remove `sync()` no longer handling RT await at back-end.
     match client.create_prompt(prompt_request).sync() {
         Ok(prompt) => {
             if let Some(answer) = prompt.answer {
@@ -121,6 +155,8 @@ fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpR
     }
 }
 
+/// This function will take a `Challenge` token from the user and compare to the one stored in the Database.
+/// if the `Challenge` match one in storage and is valid (not expired or exists) then a 'Bearer token' will be sent back to the user.
 fn set_login(challenge: String, state: State<AppState>) -> Result<HttpResponse> {
     let res = state
         .database
@@ -128,11 +164,11 @@ fn set_login(challenge: String, state: State<AppState>) -> Result<HttpResponse> 
         .from_err()
         .and_then(|res| match res {
             Ok(v) => {
-                let cookie = Cookie::new("bearer", v.unwrap().token);
+                let cookie = Cookie::new("bearer", v.clone().unwrap().token);
                 return Ok(HttpResponse::Ok()
-                    .content_type("text/html; charset=utf-8")
                     .cookie(cookie)
-                    .body("bears are coming"));
+                    .json(serde_json::to_value(&v.unwrap()).unwrap())
+                    );
             }
 
             _ => {
@@ -156,6 +192,8 @@ pub struct Bearer {
     pub ttl: i64,
 }
 
+
+/// Message for Pending
 impl Message for Pending {
     type Result = Result<Option<Bearer>, Error>;
 }
@@ -163,6 +201,7 @@ impl Message for Pending {
 impl Handler<Pending> for DbExecutor {
     type Result = Result<Option<Bearer>, Error>;
 
+	/// Handles the process for validating a `Challenge` token
     fn handle(&mut self, msg: Pending, ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
@@ -205,8 +244,6 @@ impl Handler<Pending> for DbExecutor {
             Ok(r) if !r.is_empty() => r.clone(),
             _ => vec![],
         };
-
-        dbg!(&r);
 
         let response = Some(r.pop().unwrap());
 
