@@ -18,7 +18,7 @@ struct ArangoQuery<SORT> {
 	filters: Option<Vec<String>>,
 	limit: Option<String>,
 	sort: Option<SORT>,
-	sub_query: ArangoQuery<SORT>
+	sub_query: Option<Box<ArangoQuery<SORT>>>
 }
 
 /// Generates a AQL FILTER line to be appended
