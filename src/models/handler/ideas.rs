@@ -8,7 +8,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
 use crate::DbExecutor;
+use serde::export::PhantomData;
 
+// TODO: Design a idiomatic way to generate AQL queries,
+
+// Prototype for generating AQL queries as a stack
+struct ArangoQuery<SORT> {
+	collection: String,
+	filters: Option<Vec<String>>,
+	limit: Option<String>,
+	sort: Option<SORT>,
+	sub_query: ArangoQuery<SORT>
+}
+
+/// Generates a AQL FILTER line to be appended
 fn filter_with(data: Vec<String>) -> String {
     let mut q_string = "FILTER ".to_string();
 	let s = data

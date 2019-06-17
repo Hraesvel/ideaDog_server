@@ -67,7 +67,11 @@ fn main() {
         .expect("Failed to create pool");
 
     //create the SyncArbiters for r2d2
-    let addr = SyncArbiter::start(2, move || DbExecutor(pool.clone()));
+	let arbiter_cores = env::var("ARBITER_THREAD").expect("ARBITER_THREAD must be set").parse::<usize>().unwrap_or_else(|_| {
+		eprintln!("ARBITER_THREAD must be a valid number defaulting to 1");
+		1
+	});
+	let addr = SyncArbiter::start(arbiter_cores, move || DbExecutor(pool.clone()));
 
     server::new(move || {
         let cors = Cors::build()
@@ -100,7 +104,10 @@ fn main() {
     })
 	    .bind(hostname.clone())
 	    .unwrap()
-	    .workers(2)
+	    .workers(env::var("WORKER").expect("WORKER must be set").parse::<usize>().unwrap_or_else(|_| {
+		    eprintln!("Workers must be a valid number defaulting to 1");
+		    1
+	    }))
 	    .start();
 
     println!("Starting http server: {}", hostname);
