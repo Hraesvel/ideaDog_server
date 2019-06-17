@@ -1,25 +1,45 @@
 [package]
 name = "ideadog-server"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["martin smith <msmith3d@icloud.com>"]
 edition = "2018"
+license = "MIT"
+description =  "Backend server for ideaDog project"
 
 [dependencies]
 actix-web = "0.7"
-arangors = {path = "../../arangors"}
 env_logger = "0.6.1"
 ideadog = {path = ".."}
 futures = "0.1.27"
 log = "0.4.6"
-r2d2-arangodb = {path = "../../r2d2-arangodb"}
 r2d2 = "0.8.4"
-serde = "1.0"
-serde_derive = "1.0.92"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 dotenv = "0.14.1"
+toml = "0.5"
+chrono = "0.4.6"
+failure = "0.1.5"
+base64 = "0.10.1"
+rand = "0.6"
+approveapi = "1.0.3"
 
+#arangors = {path = "../../arangors"}
+#r2d2-arangodb = {path = "../../r2d2-arangodb"}
+
+[dependencies.arangors]
+git = "https://github.com/Ostoyae/arangors.git"
+branch = "develop"
+
+[dependencies.r2d2-arangodb]
+git = "https://github.com/Ostoyae/r2d2-arangodb.git"
+version = "0.1"
+branch = "develop"
 
 [package.metadata.deb]
+maintainer = "ideaDog developer <mcodesmith@gmail.com>"
+copyright = "2019"
+license-file = ["../LICENSE"]
+extended-description = "backend server for the ideaDog project"
 depends = "$auto"
 
 

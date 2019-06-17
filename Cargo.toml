@@ -1,6 +1,6 @@
 [package]
 name = "ideadog"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["martin smith <msmith3d@icloud.com>"]
 edition = "2018"
 
@@ -8,9 +8,7 @@ edition = "2018"
 members = [".", "app"]
 
 [dependencies]
-r2d2-arangodb = {path = "../r2d2-arangodb"}
 r2d2 = "0.8.4"
-arangors = {path = "../arangors"}
 chrono = "0.4.6"
 actix = "0.7"
 actix-web = "0.7"
@@ -19,6 +17,17 @@ serde_derive = "1.0.92"
 serde_json = "1.0"
 futures = "0.1.27"
 rand = "0.6.5"
+failure = "0.1.5"
 
+#r2d2-arangodb = {path = "../r2d2-arangodb"}
+#arangors = {path = "../arangors"}
 
+[dependencies.arangors]
+git = "https://github.com/Ostoyae/arangors.git"
+branch = "develop"
+
+[dependencies.r2d2-arangodb]
+git = "https://github.com/Ostoyae/r2d2-arangodb.git"
+version = "0.1"
+branch = "develop"
 

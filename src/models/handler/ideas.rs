@@ -8,11 +8,27 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
 use crate::DbExecutor;
-use actix_web::http::header::q;
+use serde::export::PhantomData;
 
+// TODO: Design a idiomatic way to generate AQL queries,
+
+// Prototype for generating AQL queries as a stack
+struct ArangoQuery<SORT> {
+	collection: String,
+	filters: Option<Vec<String>>,
+	limit: Option<String>,
+	sort: Option<SORT>,
+	sub_query: Option<Box<ArangoQuery<SORT>>>
+}
+
+/// Generates a AQL FILTER line to be appended
 fn filter_with(data: Vec<String>) -> String {
     let mut q_string = "FILTER ".to_string();
-    let s = data.iter().map(|x| format!("'{}' IN ele.tags ", x)).collect::<Vec<String>>().join(" AND ");
+	let s = data
+		.iter()
+		.map(|x| format!("'{}' IN ele.tags ", x))
+		.collect::<Vec<String>>()
+		.join(" AND ");
 
     q_string.push_str(s.as_str());
     q_string
@@ -33,10 +49,11 @@ impl Handler<QueryIdea> for DbExecutor {
         // Handles Sort
         match &msg.sort {
             Sort::ALL => query.push_str("SORT ele.date DESC "),
-            Sort::BRIGHT => query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC "),
+	        Sort::BRIGHT => {
+		        query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
+	        }
         }
 
-        dbg!(&query);
         query.push_str("RETURN ele");
 
 	    let mut aql = AqlQuery::new(&query).batch_size(25);
@@ -75,7 +92,7 @@ impl Handler<NewIdea> for DbExecutor {
             #[serde(default)]
             pub downvotes: u32,
             pub tags: Vec<String>,
-            pub date: i64,
+//            pub date: i64,
         }
 
         let conn = self.0.get().unwrap();
@@ -86,15 +103,21 @@ impl Handler<NewIdea> for DbExecutor {
             owner: Owner::get_owner(msg.owner_id, &conn).expect("Fail to get owner details."),
             upvotes: 0,
             downvotes: 0,
-            date: Utc::now().timestamp_millis(),
+//            date: Utc::now().timestamp_millis(),
         };
 
         let data = serde_json::to_value(&new_idea).unwrap();
 
         let query = format!(
-            "INSERT {data} INTO {collection} LET i = NEW RETURN i",
-            data = data,
-            collection = "ideas"
+	        "let tags = (for t in {data}.tags return Document('tags', t))
+            INSERT MERGE({data}, {{date: DATE_NOW()}}) INTO {collection} LET idea = NEW
+            RETURN FIRST (FOR tag IN tags
+            UPDATE tag WITH {{count : tag.count + 1}} IN tags
+            INSERT {{ _from: tag._id, _to: idea._id }} INTO tag_to_idea
+            RETURN idea)
+            ",
+	        data = data,
+	        collection = "ideas"
         );
 
         let aql = AqlQuery::new(&query).batch_size(1);

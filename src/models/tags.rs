@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
-use crate::models::{Sort, Idea};
+use crate::models::{Idea, Sort};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Tag {
@@ -10,14 +10,12 @@ pub struct Tag {
 	#[serde(default)]
 	pub count: u64,
 	#[serde(default)]
-	pub ideas: Vec<Idea>
+	pub ideas: Vec<Idea>,
 }
 
 #[derive(Debug)]
 pub struct QueryTag {
 	pub id: Option<Vec<String>>,
 	pub with_ideas: bool,
-	pub sort: Sort
+	pub sort: Sort,
 }
-
-
