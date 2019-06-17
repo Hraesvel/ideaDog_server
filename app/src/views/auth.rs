@@ -17,6 +17,7 @@ use std::env;
 use std::time::Duration;
 use crate::views::users::{create_user, SignUp};
 
+/// Configs for the auth routes.
 pub fn config(cgf: App<AppState>) -> App<AppState> {
     cgf.resource("/login", |r| {
         r.method(Method::POST).with(login);
@@ -42,36 +43,10 @@ fn login((form, state): (Json<Login>, State<AppState>)) -> impl Responder {
 
     perform_approve_aip(form.email.clone(), state).unwrap()
 
-    // create ttl with a 15 min offset
-//    let ttl = ttl(15);
-//    let c = challenge_gen(32);
-//    let challenge = Challenge {
-//        _id: format!("challenges/{}", c.clone()),
-//        challenge: c,
-//        email: form.email.clone(),
-//        username: None,
-//        pending: true,
-//        ttl,
-//    };
-//
-//    let r = state
-//        .database
-//        // added challenge to database
-//        .send(challenge.clone())
-//        .from_err()
-//        .and_then(|res| match res {
-//            Ok(_) => send_magic_link(challenge, state),
-//            Err(_) => Ok(HttpResponse::Unauthorized().finish()),
-//        })
-//        .wait();
-//
-//    dbg!(r.unwrap())
-
-    //	HttpResponse::build(StatusCode::OK)
-    //		.content_type("text/html; charset")
-    //		.body("Something is happening!")
 }
 
+/// performs the step to generate a ApproveAPI prompt.
+#[deprecated]
 pub(crate) fn perform_approve_aip(form: String, state: State<AppState>) -> Result<HttpResponse> {
 
     let ttl = ttl(15);
@@ -99,17 +74,25 @@ pub(crate) fn perform_approve_aip(form: String, state: State<AppState>) -> Resul
     r
 }
 
+/// Generates a UTC timestamp in milliseconds +/- mins given.
 fn ttl(mins: i64) -> i64 {
     let ttl = (mins * 60000) + Utc::now().timestamp_millis();
     ttl
 }
 
+/// Generate a `String` token of a given size
+///
+/// # Note
+/// recommendation anything above 32 bytes
+///
 fn challenge_gen(size: usize) -> String {
     let mut nonce = vec![0u8; size];
     OsRng::new().unwrap().fill_bytes(&mut nonce);
     base64::encode_config(&nonce, base64::URL_SAFE)
 }
 
+// TODO: swap out bool for an RESULT type
+/// Check is a user (by email) exists in the Database registry
 pub(crate) fn exist_user(email: String, state: &State<AppState>) -> bool {
     let response = state
         .database
@@ -123,6 +106,13 @@ pub(crate) fn exist_user(email: String, state: &State<AppState>) -> bool {
     response.unwrap()
 }
 
+// TODO: Converting this simple send a magic-link email, REALTIME prompts will be handled by front-end.
+/// This Function will send a magic link to the user's email provided at login/signup.
+///
+/// # Note
+/// This function will unlikely be use in production and is purely for demo purposes if the front-end isn't acceptable
+///
+///
 fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpResponse> {
     let client = approveapi::create_client(
         env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"),
@@ -137,9 +127,11 @@ fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpR
     prompt_request.title = Some("Magic sign-in link".to_string());
     prompt_request.approve_text = Some("Accept".to_string());
     prompt_request.reject_text = Some("Reject".to_string());
-//    prompt_request.expires_in = Some(900.0);
+//    TODO: Realtime approval will be handled but the front-end.
+//    prompt_request.reject_redirect_url = Some(env::var("REDIRECT_URL").expect("IDEADOG_HOME must be set"));
     prompt_request.long_poll = Some(true);
 
+	// TODO: remove `sync()` no longer handling RT await at back-end.
     match client.create_prompt(prompt_request).sync() {
         Ok(prompt) => {
             if let Some(answer) = prompt.answer {
@@ -163,6 +155,8 @@ fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpR
     }
 }
 
+/// This function will take a `Challenge` token from the user and compare to the one stored in the Database.
+/// if the `Challenge` match one in storage and is valid (not expired or exists) then a 'Bearer token' will be sent back to the user.
 fn set_login(challenge: String, state: State<AppState>) -> Result<HttpResponse> {
     let res = state
         .database
@@ -198,6 +192,8 @@ pub struct Bearer {
     pub ttl: i64,
 }
 
+
+/// Message for Pending
 impl Message for Pending {
     type Result = Result<Option<Bearer>, Error>;
 }
@@ -205,6 +201,7 @@ impl Message for Pending {
 impl Handler<Pending> for DbExecutor {
     type Result = Result<Option<Bearer>, Error>;
 
+	/// Handles the process for validating a `Challenge` token
     fn handle(&mut self, msg: Pending, ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
