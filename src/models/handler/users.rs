@@ -6,7 +6,7 @@ use r2d2::Error;
 
 use serde_json;
 
-use crate::{DbExecutor, NewUser, QueryUser, User};
+use crate::{DbExecutor, NewUser, QueryUser, User, QUser};
 
 impl Handler<QueryUser> for DbExecutor {
 	type Result = Result<Vec<User>, Error>;
@@ -23,6 +23,44 @@ impl Handler<QueryUser> for DbExecutor {
 				.bind_var("ele", t.clone())
 				.batch_size(1);
 		}
+
+		let response: Vec<User> = match conn.aql_query(aql) {
+			Ok(r) => r,
+			Err(e) => {
+				println!("Error: {}", e);
+				vec![]
+			}
+		};
+
+		Ok(response)
+	}
+}
+
+impl Handler<QUser> for DbExecutor {
+	type Result = Result<Vec<User>, Error>;
+
+	fn handle(&mut self, msg: QUser, _ctx: &mut Self::Context) -> Self::Result {
+		let conn = self.0.get().unwrap();
+
+		let mut aql = AqlQuery::new("");
+
+		match msg {
+			QUser::TOKEN(tok) => {
+				aql = AqlQuery::new(
+					"FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u",
+				)
+					.bind_var("ele", tok.clone())
+					.batch_size(1);
+			},
+			QUser::ID(id) => {
+				aql = AqlQuery::new(
+					"RETURN DOCUMENT('users', @ele)"
+				)
+					.bind_var("ele", id.clone())k
+					.batch_size(1);
+			},
+		}
+		k
 
 		let response: Vec<User> = match conn.aql_query(aql) {
 			Ok(r) => r,

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::cmp::max;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct User {
@@ -21,6 +22,18 @@ pub struct User {
 pub struct QueryUser {
 	// find the token and then get the user it points to.
 	pub token: Option<String>,
+	pub id: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct QUserParams {
+	include_ideas: Option<bool>,
+}
+
+
+pub enum QUser {
+	TOKEN(String, QUserParams),
+	ID(String, QUserParams),
 }
 
 #[derive(Debug, Serialize, Default, Clone)]

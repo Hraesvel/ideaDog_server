@@ -4,23 +4,24 @@ use crate::midware::AuthMiddleware;
 use crate::views::auth::{exist_user, perform_approve_aip};
 use actix_web::http::{Method, NormalizePath, StatusCode};
 use actix_web::actix::{Message, Handler};
-use actix_web::{App, FutureResponse, HttpResponse, Responder, State, Path};
+use actix_web::{App, FutureResponse, HttpResponse, Responder, State, Path, Query};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use chrono::Utc;
 use futures::future::{ok, Future, IntoFuture};
-use ideadog::{NewUser, QueryUser, DbExecutor, Idea};
+use ideadog::{NewUser, QueryUser, DbExecutor, Idea, QUser, QUserParams};
 use serde::Deserialize;
 use r2d2::Error;
 use arangors::AqlQuery;
+use actix_web::http::header::q;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/user", |scope| {
         scope
-            .resource("/", |r| {
+	        .resource("/", |r| {
                 r.middleware(AuthMiddleware);
                 r.method(Method::GET).with(get_user);
             })
-            .default_resource(|r| {
+	        .default_resource(|r| {
                 r.h(NormalizePath::new(
                     true,
                     true,
@@ -28,7 +29,10 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
                 ));
                 r.method(Method::POST).with(create_user);
             })
-            .resource("/{id}/ideas", |r|{
+	        .resource("/{id}", |r| {
+		        r.method(Method::GET).with(get_user_by_id);
+	        })
+	        .resource("/{id}/ideas", |r|{
                 r.method(Method::GET).with(get_user_ideas);
             })
         //		     .resource("/", |r| {
@@ -43,17 +47,6 @@ pub(crate) struct SignUp {
     pub email: String,
 }
 
-fn run_query(qufigs: QueryUser, state: State<AppState>) -> FutureResponse<HttpResponse> {
-    state
-        .database
-        .send(qufigs)
-        .from_err()
-        .and_then(|res| match res {
-            Ok(ideas) => Ok(HttpResponse::Ok().json(ideas)),
-            Err(_) => Ok(HttpResponse::InternalServerError().into()),
-        })
-        .responder()
-}
 
 #[derive(Deserialize, Debug)]
 struct UIdeas(String);
@@ -94,7 +87,25 @@ impl Handler<UIdeas> for DbExecutor {
 }
 
 
-fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Responder {
+fn run_query(qufigs: QUser, state: State<AppState>) -> FutureResponse<HttpResponse> {
+	state
+		.database
+		.send(qufigs)
+		.from_err()
+		.and_then(|res| match res {
+			Ok(user) => Ok(HttpResponse::Ok().json(user)),
+			Err(_) => Ok(HttpResponse::InternalServerError().into()),
+		})
+		.responder()
+}
+
+fn get_user_by_id((path, qparam, state): (Path<String>, Query<QUserParams>, State<AppState>)) -> FutureResponse<HttpResponse> {
+	let qufig = QUser::ID(path.into_inner(), qparam.into_inner());
+
+	run_query(qufig, state)
+}
+
+fn get_user((req, qparam, state): (HttpRequest<AppState>, Query<QUserParams>, State<AppState>)) -> FutureResponse<HttpResponse> {
     let tok = req
         .headers()
         .get("AUTHORIZATION")
@@ -112,7 +123,8 @@ fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Resp
 
     //    HttpResponse::Ok().finish();
 
-    let qufig = QueryUser { token: Some(token) };
+//    let qufig = QueryUser { token: Some(token), id: None };
+	let qufig = QUser::TOKEN(token, qparam.into_inner());
 
     run_query(qufig, state)
 }
