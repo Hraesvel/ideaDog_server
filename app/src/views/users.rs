@@ -1,14 +1,14 @@
 use crate::AppState;
 
 use crate::midware::AuthMiddleware;
-use crate::views::auth::{exist_user, perform_approve_aip};
+use crate::views::auth::{exist_user, login, ttl, challenge_gen};
 use actix_web::http::{Method, NormalizePath, StatusCode};
 use actix_web::actix::{Message, Handler};
 use actix_web::{App, FutureResponse, HttpResponse, Responder, State, Path};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use chrono::Utc;
 use futures::future::{ok, Future, IntoFuture};
-use ideadog::{NewUser, QueryUser, DbExecutor, Idea};
+use ideadog::{NewUser, QueryUser, DbExecutor, Idea, Login, Challenge};
 use serde::Deserialize;
 use r2d2::Error;
 use arangors::AqlQuery;
@@ -117,10 +117,12 @@ fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Resp
     run_query(qufig, state)
 }
 
-pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> impl Responder {
-    if exist_user(json.email.clone(), &state) {
-        let response = perform_approve_aip(json.email.clone(), state);
-        return response;
+pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> HttpResponse {
+    if exist_user(json.email.clone(), &state).is_ok() {
+        let log = Login {
+            email: json.email.clone()
+        };
+        return login((Json(log), state));
     };
 
     let new_user = NewUser {
@@ -131,15 +133,44 @@ pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> imp
         ..NewUser::default()
     };
 
+    let chall = challenge_gen(32);
+    let challenge = Challenge {
+        challenge: chall.clone(),
+        email: json.email.clone(),
+        username: None,
+        pending: true,
+        ttl: ttl(15)
+    };
+
     let response = state
         .database
         .send(new_user)
 //        .from_err()
         .and_then(|res| match res {
-            Ok(ideas) => Ok(HttpResponse::Ok().json(ideas)),
+            Ok(u) => Ok(HttpResponse::Ok().json(u)),
             Err(_) => Ok(HttpResponse::InternalServerError().into()),
-        })
-        .wait();
+        }).map_err(|x| return x)
+        .then(|_|
+            state
+                .database
+                .send(challenge)
+//                .from_err()
+                .and_then(|res| match res {
+                    Ok(_) => Ok(HttpResponse::Ok().json(chall)),
+                    Err(_) => Ok(HttpResponse::build(StatusCode::BAD_REQUEST).into())
+                })
+                .map_err(|x| return x)
+        ).wait();
 
-    perform_approve_aip(json.email.clone(), state)
+
+//    let c = state
+//        .database
+//        .send(challenge)
+//        .from_err()
+//        .and_then(|res| match res {
+//            Ok(_) => Ok(HttpResponse::Ok().json(chall).finish()),
+//            Err(_) => Ok(HttpResponse::build(StatusCode::BAD_REQUEST).json("badrequest").finish())
+//        }).wait();
+
+    response.unwrap()
 }

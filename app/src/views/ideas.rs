@@ -54,7 +54,7 @@ fn run_query(qufigs: QueryIdea, state: State<AppState>) -> FutureResponse<HttpRe
 		.send(qufigs)
 		.from_err()
 		.and_then(|res| match res {
-			Ok(ideas) => Ok(HttpResponse::Ok().json(ideas)),
+			Ok(ideas) => Ok(HttpResponse::Ok().chunked().json(ideas)),
 			Err(_) => Ok(HttpResponse::InternalServerError().into()),
 		})
 		.responder()

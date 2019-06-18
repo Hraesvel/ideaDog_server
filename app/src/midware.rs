@@ -57,15 +57,18 @@ fn verify_token(token: String, state: &AppState) -> Result<Started> {
 }
 
 #[derive(Debug, Fail)]
-enum ServiceError {
+pub(crate) enum ServiceError {
 	#[fail(display = "Unauthorised")]
 	Unauthorised,
+	#[fail(display = "Bad Request")]
+	BadRequest
 }
 
 impl ResponseError for ServiceError {
 	fn error_response(&self) -> HttpResponse {
 		match self {
 			ServiceError::Unauthorised => HttpResponse::Unauthorized().json("Unauthorised"),
+			ServiceError::BadRequest => HttpResponse::BadRequest().json("Bad_Request")
 		}
 	}
 }
