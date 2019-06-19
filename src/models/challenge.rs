@@ -13,7 +13,6 @@ pub struct Signup {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Challenge {
-	pub _id: String,
 	#[serde(alias = "_key")]
 	#[serde(rename(serialize = "_key"))]
 	pub challenge: String,

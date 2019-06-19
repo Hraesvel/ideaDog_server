@@ -20,7 +20,7 @@ impl Handler<Login> for DbExecutor {
 			.batch_size(1);
 
 		let res = conn.aql_query(aql).unwrap();
-
+		dbg!(&res);
 		Ok(res)
 	}
 }

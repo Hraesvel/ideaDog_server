@@ -54,7 +54,7 @@ fn run_query(qufigs: QueryIdea, state: State<AppState>) -> FutureResponse<HttpRe
 		.send(qufigs)
 		.from_err()
 		.and_then(|res| match res {
-			Ok(ideas) => Ok(HttpResponse::Ok().json(ideas)),
+			Ok(ideas) => Ok(HttpResponse::Ok().chunked().json(ideas)),
 			Err(_) => Ok(HttpResponse::InternalServerError().into()),
 		})
 		.responder()
@@ -148,82 +148,82 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
 		.responder()
 }
 
-#[cfg(test)]
-mod test {
-	use crate::views::ideas::{create_idea, get_idea_id, get_ideas, get_ideas_sort};
-	use crate::AppState;
-	use actix_web::actix::SyncArbiter;
-	use actix_web::http::Method;
-	use actix_web::test::TestServer;
-	use ideadog::DbExecutor;
-	use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
-
-	use std::env;
-
-	fn build_test_server() -> TestServer {
-		let _ = dotenv::dotenv();
-		let mut srv = TestServer::build_with_state(|| {
-			let adder = SyncArbiter::start(3, || {
-				// arangodb connection configurations.
-				let arango_config = ConnectionOptions::builder()
-					.with_auth_jwt(
-						env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
-						env::var("DB_PASSWORD").expect("DB_PASSWORD must be set."),
-					)
-					.with_host(
-						env::var("DB_HOST").expect("DB_HOST must be set"),
-						env::var("DB_PORT")
-							.expect("DB_PORT must be set")
-							.parse()
-							.expect("DB_PORT must be digits"),
-					)
-					.with_db(env::var("DB_NAME").expect("DB_NAME must be set."))
-					.build();
-				let manager = ArangodbConnectionManager::new(arango_config);
-
-				let pool = r2d2::Pool::builder()
-					.build(manager)
-					.expect("Failed to create pool");
-
-				DbExecutor(pool.clone())
-			});
-			AppState {
-				database: adder.clone(),
-			}
-		})
-			.start(|app| {
-				app.resource("/ideas", |r| {
-					r.method(Method::GET).with(get_ideas);
-				})
-				   .resource("/ideas/{sort}", |r| {
-					   r.method(Method::GET).with(get_ideas_sort);
-				   })
-				   .resource("/idea", |r| r.method(Method::POST).with(create_idea))
-				   .resource("/idea/{id}/", |r| {
-					   r.method(Method::GET).with(get_idea_id);
-				   });
-			});
-
-		srv
-	}
-
-	#[test]
-	fn test_get_all_ideas() {
-		let mut srv = build_test_server();
-
-		let all_ideas = srv.client(Method::GET, "/ideas").finish().unwrap();
-		let response = srv.execute(all_ideas.send()).unwrap();
-
-		dbg!(&response);
-		assert!(response.status().is_success());
-	}
-
-	#[test]
-	fn test_get_sorted_ideas() {
-		let mut srv = build_test_server();
-
-		let sort_ideas = srv.client(Method::GET, "/ideas/bright").finish().unwrap();
-		let response = srv.execute(sort_ideas.send()).unwrap();
-		assert!(response.status().is_success());
-	}
-}
+//#[cfg(test)]
+//mod test {
+//	use crate::views::ideas::{create_idea, get_idea_id, get_ideas, get_ideas_sort};
+//	use crate::AppState;
+//	use actix_web::actix::SyncArbiter;
+//	use actix_web::http::Method;
+//	use actix_web::test::TestServer;
+//	use ideadog::DbExecutor;
+//	use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
+//
+//	use std::env;
+//
+//	fn build_test_server() -> TestServer {
+//		let _ = dotenv::dotenv();
+//		let mut srv = TestServer::build_with_state(|| {
+//			let adder = SyncArbiter::start(3, || {
+//				// arangodb connection configurations.
+//				let arango_config = ConnectionOptions::builder()
+//					.with_auth_jwt(
+//						env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
+//						env::var("DB_PASSWORD").expect("DB_PASSWORD must be set."),
+//					)
+//					.with_host(
+//						env::var("DB_HOST").expect("DB_HOST must be set"),
+//						env::var("DB_PORT")
+//							.expect("DB_PORT must be set")
+//							.parse()
+//							.expect("DB_PORT must be digits"),
+//					)
+//					.with_db(env::var("DB_NAME").expect("DB_NAME must be set."))
+//					.build();
+//				let manager = ArangodbConnectionManager::new(arango_config);
+//
+//				let pool = r2d2::Pool::builder()
+//					.build(manager)
+//					.expect("Failed to create pool");
+//
+//				DbExecutor(pool.clone())
+//			});
+//			AppState {
+//				database: adder.clone(),
+//			}
+//		})
+//			.start(|app| {
+//				app.resource("/ideas", |r| {
+//					r.method(Method::GET).with(get_ideas);
+//				})
+//				   .resource("/ideas/{sort}", |r| {
+//					   r.method(Method::GET).with(get_ideas_sort);
+//				   })
+//				   .resource("/idea", |r| r.method(Method::POST).with(create_idea))
+//				   .resource("/idea/{id}/", |r| {
+//					   r.method(Method::GET).with(get_idea_id);
+//				   });
+//			});
+//
+//		srv
+//	}
+//
+//	#[test]
+//	fn test_get_all_ideas() {
+//		let mut srv = build_test_server();
+//
+//		let all_ideas = srv.client(Method::GET, "/ideas").finish().unwrap();
+//		let response = srv.execute(all_ideas.send()).unwrap();
+//
+//		dbg!(&response);
+//		assert!(response.status().is_success());
+//	}
+//
+//	#[test]
+//	fn test_get_sorted_ideas() {
+//		let mut srv = build_test_server();
+//
+//		let sort_ideas = srv.client(Method::GET, "/ideas/bright").finish().unwrap();
+//		let response = srv.execute(sort_ideas.send()).unwrap();
+//		assert!(response.status().is_success());
+//	}
+//}
