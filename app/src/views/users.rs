@@ -1,27 +1,29 @@
 use crate::AppState;
 
 use crate::midware::AuthMiddleware;
-use crate::views::auth::{exist_user, login, ttl, challenge_gen, Token};
+use crate::views::auth::{challenge_gen, exist_user, login, ttl, Token};
+use actix_web::actix::{Handler, Message};
+use actix_web::http::header::q;
 use actix_web::http::{Method, NormalizePath, StatusCode};
-use actix_web::actix::{Message, Handler};
-use actix_web::{App, FutureResponse, HttpResponse, Responder, State, Path};
+use actix_web::{App, FutureResponse, HttpResponse, Path, Query, Responder, State};
 use actix_web::{AsyncResponder, HttpRequest, Json};
+use arangors::AqlQuery;
 use chrono::Utc;
 use futures::future::{ok, Future, IntoFuture};
-use ideadog::{NewUser, QueryUser, DbExecutor, Idea, Login, Challenge};
-use serde::Deserialize;
+use ideadog::{Challenge, DbExecutor, Idea, Login, NewUser, QueryUser};
+use ideadog::{QUser, QUserParams};
 use r2d2::Error;
+use serde::Deserialize;
 use serde::Serialize;
-use arangors::AqlQuery;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/user", |scope| {
         scope
-            .resource("/", |r| {
+	        .resource("/", |r| {
                 r.middleware(AuthMiddleware);
                 r.method(Method::GET).with(get_user);
             })
-            .default_resource(|r| {
+	        .default_resource(|r| {
                 r.h(NormalizePath::new(
                     true,
                     true,
@@ -29,7 +31,10 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
                 ));
                 r.method(Method::POST).with(create_user);
             })
-            .resource("/{id}/ideas", |r|{
+	        .resource("/{id}", |r| {
+		        r.method(Method::GET).with(get_user_by_id);
+	        })
+	        .resource("/{id}/ideas", |r| {
                 r.method(Method::GET).with(get_user_ideas);
             })
         //		     .resource("/", |r| {
@@ -44,30 +49,19 @@ pub(crate) struct SignUp {
     pub email: String,
 }
 
-fn run_query(qufigs: QueryUser, state: State<AppState>) -> FutureResponse<HttpResponse> {
-    state
-        .database
-        .send(qufigs)
-        .from_err()
-        .and_then(|res| match res {
-            Ok(ideas) => Ok(HttpResponse::Ok().json(ideas)),
-            Err(_) => Ok(HttpResponse::InternalServerError().into()),
-        })
-        .responder()
-}
-
 #[derive(Deserialize, Debug)]
 struct UIdeas(String);
 
-fn get_user_ideas((path,state): (Path<String>, State<AppState>)) -> FutureResponse<HttpResponse> {
+fn get_user_ideas((path, state): (Path<String>, State<AppState>)) -> FutureResponse<HttpResponse> {
     state
-        .database
-        .send(UIdeas(path.into_inner().clone()))
-        .from_err()
-        .and_then( |res| match res {
+	    .database
+	    .send(UIdeas(path.into_inner().clone()))
+	    .from_err()
+	    .and_then(|res| match res {
             Ok(r) => Ok(HttpResponse::Ok().json(r)),
             Err(_) => Ok(HttpResponse::InternalServerError().into()),
-        }).responder()
+	    })
+	    .responder()
 }
 
 impl Message for UIdeas {
@@ -81,21 +75,44 @@ impl Handler<UIdeas> for DbExecutor {
         let conn = self.0.get().unwrap();
 
         let aql = AqlQuery::new(
-            "FOR i in 1..1 INBOUND CONCAT('users/', @id ) idea_owner
-        return i").bind_var("id", msg.0)
-                  .batch_size(25);
+	        "FOR i in 1..1 INBOUND CONCAT('users/', @id ) idea_owner
+        return i",
+        )
+	        .bind_var("id", msg.0)
+	        .batch_size(25);
 
-        let response: Vec<Idea>  = match conn.aql_query(aql) {
+	    let response: Vec<Idea> = match conn.aql_query(aql) {
             Ok(r) => r,
-            Err(_) => vec![]
+		    Err(_) => vec![],
         };
 
         Ok(response)
     }
 }
 
+fn run_query(qufigs: QUser, state: State<AppState>) -> FutureResponse<HttpResponse> {
+	state
+		.database
+		.send(qufigs)
+		.from_err()
+		.and_then(|res| match res {
+			Ok(user) => Ok(HttpResponse::Ok().json(user)),
+			Err(_) => Ok(HttpResponse::InternalServerError().into()),
+		})
+		.responder()
+}
 
-fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Responder {
+fn get_user_by_id(
+	(path, qparam, state): (Path<String>, Query<QUserParams>, State<AppState>),
+) -> FutureResponse<HttpResponse> {
+	let qufig = QUser::ID(path.into_inner(), qparam.into_inner());
+
+	run_query(qufig, state)
+}
+
+fn get_user(
+	(req, qparam, state): (HttpRequest<AppState>, Query<QUserParams>, State<AppState>),
+) -> FutureResponse<HttpResponse> {
     let tok = req
         .headers()
         .get("AUTHORIZATION")
@@ -113,7 +130,8 @@ fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Resp
 
     //    HttpResponse::Ok().finish();
 
-    let qufig = QueryUser { token: Some(token) };
+	//    let qufig = QueryUser { token: Some(token), id: None };
+	let qufig = QUser::TOKEN(token, qparam.into_inner());
 
     run_query(qufig, state)
 }
@@ -121,7 +139,7 @@ fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Resp
 pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> HttpResponse {
 	if exist_user(json.email.clone(), &state).is_ok() {
         let log = Login {
-            email: json.email.clone()
+	        email: json.email.clone(),
         };
         return login((Json(log), state));
     };
@@ -134,44 +152,47 @@ pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> Htt
         ..NewUser::default()
     };
 
-	let chall = Token { token: challenge_gen(32) };
+	let chall = Token {
+		token: challenge_gen(32),
+	};
 	let challenge = Challenge {
 		challenge: chall.token.clone(),
 		email: json.email.clone(),
 		username: None,
 		pending: true,
-		ttl: ttl(15)
+		ttl: ttl(15),
 	};
 
     let response = state
         .database
         .send(new_user)
-//        .from_err()
+	    //        .from_err()
         .and_then(|res| match res {
             Ok(u) => Ok(HttpResponse::Ok().json(u)),
             Err(_) => Ok(HttpResponse::InternalServerError().into()),
-        }).map_err(|x| return x)
-        .then(|_|
+        })
+        .map_err(|x| return x)
+        .then(|_| {
             state
                 .database
                 .send(challenge)
-//                .from_err()
+	            //                .from_err()
                 .and_then(|res| match res {
                     Ok(_) => Ok(HttpResponse::Ok().json(chall)),
-                    Err(_) => Ok(HttpResponse::build(StatusCode::BAD_REQUEST).into())
+	                Err(_) => Ok(HttpResponse::build(StatusCode::BAD_REQUEST).into()),
                 })
                 .map_err(|x| return x)
-        ).wait();
+        })
+        .wait();
 
-
-//    let c = state
-//        .database
-//        .send(challenge)
-//        .from_err()
-//        .and_then(|res| match res {
-//            Ok(_) => Ok(HttpResponse::Ok().json(chall).finish()),
-//            Err(_) => Ok(HttpResponse::build(StatusCode::BAD_REQUEST).json("badrequest").finish())
-//        }).wait();
+	//    let c = state
+	//        .database
+	//        .send(challenge)
+	//        .from_err()
+	//        .and_then(|res| match res {
+	//            Ok(_) => Ok(HttpResponse::Ok().json(chall).finish()),
+	//            Err(_) => Ok(HttpResponse::build(StatusCode::BAD_REQUEST).json("badrequest").finish())
+	//        }).wait();
 
     response.unwrap()
 }

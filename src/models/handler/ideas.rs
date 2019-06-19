@@ -111,13 +111,15 @@ impl Handler<NewIdea> for DbExecutor {
         let query = format!(
 	        "let tags = (for t in {data}.tags return Document('tags', t))
             INSERT MERGE({data}, {{date: DATE_NOW()}}) INTO {collection} LET idea = NEW
+			INSERT {{ _from: idea.id, _to: {owner} }} IN Idea_owner
             RETURN FIRST (FOR tag IN tags
             UPDATE tag WITH {{count : tag.count + 1}} IN tags
             INSERT {{ _from: tag._id, _to: idea._id }} INTO tag_to_idea
             RETURN idea)
             ",
 	        data = data,
-	        collection = "ideas"
+	        collection = "ideas",
+	        owner = format!("users/{}", new_idea.owner.id)
         );
 
         let aql = AqlQuery::new(&query).batch_size(1);
