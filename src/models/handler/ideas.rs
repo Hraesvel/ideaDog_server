@@ -56,7 +56,7 @@ impl Handler<QueryIdea> for DbExecutor {
 
         query.push_str("RETURN ele");
 
-	    let mut aql = AqlQuery::new(&query).batch_size(25);
+	    let mut aql = AqlQuery::new(&query).batch_size(50);
 
         if let Some(id) = msg.id {
             aql = AqlQuery::new("RETURN DOCUMENT(CONCAT('ideas/', @id ))")

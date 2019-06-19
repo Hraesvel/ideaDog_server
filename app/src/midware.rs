@@ -17,6 +17,8 @@ impl Middleware<AppState> for AuthMiddleware {
 		}
 
 		let state: &AppState = req.state();
+		let cookie_tok = req
+			.cookie("bearer");
 
 		let token = req
 			.headers()
@@ -24,10 +26,14 @@ impl Middleware<AppState> for AuthMiddleware {
 			.map(|value| value.to_str().ok())
 			.ok_or(ServiceError::Unauthorised)?;
 
+		let token = cookie_tok;
+
 		match token {
 			Some(t) => {
-				let mut token = t.split(" ").map(|x| x.to_string()).collect::<Vec<String>>();
-				verify_token(token.pop().unwrap().to_owned(), state)
+//				let mut token = t.split(" ").map(|x| x.to_string()).collect::<Vec<String>>();
+//				verify_token(token.pop().unwrap().to_owned(), state)
+				dbg!(&t.value());
+				verify_token(t.value().to_owned(), state)
 			}
 			None => Err(ServiceError::Unauthorised.into()),
 		}

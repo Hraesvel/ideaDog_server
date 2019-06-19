@@ -169,8 +169,11 @@ fn set_login((challenge, state): (Json<Pending>, State<AppState>)) -> FutureResp
 	    .from_err()
 	    .and_then(|res| match res {
             Ok(v) => {
-                let cookie = Cookie::new("bearer", v.clone().unwrap().token);
-                return Ok(HttpResponse::Ok()
+                let cookie = Cookie::build("bearer", v.clone().unwrap().token)
+	                .http_only(true)
+	                .finish();
+
+	            return Ok(HttpResponse::Ok()
                     .cookie(cookie)
                     .json(serde_json::to_value(&v.unwrap()).unwrap())
                     );
