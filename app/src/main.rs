@@ -103,6 +103,7 @@ fn main() {
 	        .finish()
     })
 	    .bind(hostname.clone())
+
 	    .unwrap()
 	    .workers(env::var("WORKER").expect("WORKER must be set").parse::<usize>().unwrap_or_else(|_| {
 		    eprintln!("Workers must be a valid number defaulting to 1");

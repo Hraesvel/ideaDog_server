@@ -19,6 +19,9 @@ use std::time::Duration;
 use crate::views::users::{create_user, SignUp};
 use actix::MailboxError;
 
+#[derive(Deserialize, Debug, Serialize)]
+pub struct Token { pub token: String }
+
 /// Configs for the auth routes.
 pub fn config(cgf: App<AppState>) -> App<AppState> {
     cgf.resource("/login", |r| {
@@ -36,8 +39,7 @@ pub(crate) fn login((json, state): (Json<Login>, State<AppState>)) -> HttpRespon
 	if exist_user(json.email.clone(), &state).is_err() {
         return HttpResponse::build(StatusCode::TEMPORARY_REDIRECT).finish();
     }
-	#[derive(Deserialize, Debug, Serialize)]
-	struct Token { token: String };
+
 
 	let chall = Token { token: challenge_gen(32) };
 	let challenge = Challenge {
@@ -119,6 +121,7 @@ pub(crate) fn exist_user(email: String, state: &State<AppState>) -> Result<(), M
         .wait();
 
 	response
+
 }
 
 /// This Function will send a magic link to the user's email provided at login/signup.
@@ -205,26 +208,28 @@ impl Handler<Pending> for DbExecutor {
     fn handle(&mut self, msg: Pending, ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
+		println!("handle");
 
 		// Check if the prompt exists and has been answered.
 		let client = approveapi::create_client(
 			env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"), );
-		let answer = client.get_prompt(&msg.prompt_id, false).wait();
-		match answer {
-			Ok(prompt) => {
-				if let Some(answer) = prompt.answer {
-					if answer.result {
-						println!("Request is Approved");
-					} else {
-						println!("Request was Rejected");
-						return Err(ServiceError::Unauthorised)
-					}
-					println!("timeout");
-					return Err(ServiceError::Unauthorised)
-				}
-			},
-			_ => return Err(ServiceError::BadRequest)
-		}
+		let answer = client.get_prompt(&msg.prompt_id, false).sync();
+
+//		match answer {
+//			Ok(prompt) => {
+//				if let Some(answer) = prompt.answer {
+//					if answer.result {
+//						println!("Request is Approved");
+//					} else {
+//						println!("Request was Rejected");
+//						return Err(ServiceError::Unauthorised)
+//					}
+//					println!("timeout");
+//					return Err(ServiceError::Unauthorised)
+//				}
+//			},
+//			_ => return Err(ServiceError::BadRequest)
+//		}
 
 
         let bearer = Bearer {
@@ -238,8 +243,7 @@ impl Handler<Pending> for DbExecutor {
 			FILTER c._key == @challenge
             REMOVE c in challenges let ch = OLD
 			RETURN ch
-		",
-        )
+		")
 	        .bind_var("challenge", msg.token.clone())
 	        .batch_size(1);
 
@@ -268,7 +272,6 @@ impl Handler<Pending> for DbExecutor {
             Ok(r) if !r.is_empty() => r.clone(),
             _ => vec![],
         };
-
         let response = Some(r.pop().unwrap());
 
         Ok(response)

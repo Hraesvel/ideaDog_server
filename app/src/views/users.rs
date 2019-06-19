@@ -1,7 +1,7 @@
 use crate::AppState;
 
 use crate::midware::AuthMiddleware;
-use crate::views::auth::{exist_user, login, ttl, challenge_gen};
+use crate::views::auth::{exist_user, login, ttl, challenge_gen, Token};
 use actix_web::http::{Method, NormalizePath, StatusCode};
 use actix_web::actix::{Message, Handler};
 use actix_web::{App, FutureResponse, HttpResponse, Responder, State, Path};
@@ -11,6 +11,7 @@ use futures::future::{ok, Future, IntoFuture};
 use ideadog::{NewUser, QueryUser, DbExecutor, Idea, Login, Challenge};
 use serde::Deserialize;
 use r2d2::Error;
+use serde::Serialize;
 use arangors::AqlQuery;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
@@ -118,7 +119,7 @@ fn get_user((req, state): (HttpRequest<AppState>, State<AppState>)) -> impl Resp
 }
 
 pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> HttpResponse {
-    if exist_user(json.email.clone(), &state).is_ok() {
+	if exist_user(json.email.clone(), &state).is_ok() {
         let log = Login {
             email: json.email.clone()
         };
@@ -133,14 +134,14 @@ pub(crate) fn create_user((json, state): (Json<SignUp>, State<AppState>)) -> Htt
         ..NewUser::default()
     };
 
-    let chall = challenge_gen(32);
-    let challenge = Challenge {
-        challenge: chall.clone(),
-        email: json.email.clone(),
-        username: None,
-        pending: true,
-        ttl: ttl(15)
-    };
+	let chall = Token { token: challenge_gen(32) };
+	let challenge = Challenge {
+		challenge: chall.token.clone(),
+		email: json.email.clone(),
+		username: None,
+		pending: true,
+		ttl: ttl(15)
+	};
 
     let response = state
         .database
