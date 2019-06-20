@@ -113,22 +113,22 @@ fn get_user_by_id(
 fn get_user(
 	(req, qparam, state): (HttpRequest<AppState>, Query<QUserParams>, State<AppState>),
 ) -> FutureResponse<HttpResponse> {
-//    let tok = req
-//        .headers()
-//        .get("AUTHORIZATION")
-//        .map(|value| value.to_str().ok())
-//        .unwrap();
-//    //    dbg!(tok);
-//
-//    let mut token = tok
-//        .unwrap()
-//        .split(" ")
-//        .map(|x| x.to_string())
-//        .collect::<Vec<String>>()
-//        .pop()
-//        .unwrap();
+    let tok = req
+        .headers()
+        .get("AUTHORIZATION")
+        .map(|value| value.to_str().ok())
+        .unwrap();
+    //    dbg!(tok);
 
-	let token = req.cookie("bearer").unwrap().value().to_owned();
+    let mut token = tok
+        .unwrap()
+        .split(" ")
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>()
+        .pop()
+        .unwrap();
+
+//	let token = req.cookie("bearer").unwrap().value().to_owned();
 
 
 	//    let qufig = QueryUser { token: Some(token), id: None };

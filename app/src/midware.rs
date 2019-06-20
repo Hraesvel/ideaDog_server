@@ -17,8 +17,7 @@ impl Middleware<AppState> for AuthMiddleware {
 		}
 
 		let state: &AppState = req.state();
-		let cookie_tok = req
-			.cookie("bearer");
+
 
 		let token = req
 			.headers()
@@ -26,15 +25,19 @@ impl Middleware<AppState> for AuthMiddleware {
 			.map(|value| value.to_str().ok())
 			.ok_or(ServiceError::Unauthorised)?;
 
-		let token = cookie_tok;
+
+		let cookie = req
+			.cookie("bearer");
+
+		let token = cookie;
 
 		match token {
 			Some(t) => {
 //				let mut token = t.split(" ").map(|x| x.to_string()).collect::<Vec<String>>();
 //				verify_token(token.pop().unwrap().to_owned(), state)
-				dbg!(&t.value());
-				verify_token(t.value().to_owned(), state)
-			}
+				let value = dbg!(t.value());
+				return verify_token(value.to_string(), state)
+			},
 			None => Err(ServiceError::Unauthorised.into()),
 		}
 	}
@@ -45,19 +48,22 @@ struct Verify(String);
 /// Verify token function queries the database to see if the provided token
 /// existed in the database
 fn verify_token(token: String, state: &AppState) -> Result<Started> {
-	let t = Verify(token);
+	let tok = Verify(token);
 
-	let conn = state
+	let response = state
 		.database
-		.send(t)
+		.send(tok)
 		.from_err()
 		.and_then(|res| match res {
-			true => return Ok(Started::Done),
-			false => return Err(ServiceError::Unauthorised.into()),
+			true =>  {
+				println!("woot");
+				Ok(Started::Done)
+			},
+			false => {
+				println!("what the?!");
+				Err(ServiceError::Unauthorised.into())},
 		})
 		.wait();
-
-	let response = conn;
 
 	response
 }
@@ -92,7 +98,7 @@ impl Handler<Verify> for DbExecutor {
 			.bind_var("tok", msg.0.clone())
 			.batch_size(1);
 
-		let response = conn.aql_query(aql).unwrap();
+		let response = dbg!(conn.aql_query(aql).unwrap());
 		response[0]
 	}
 }

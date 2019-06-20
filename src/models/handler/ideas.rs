@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
 use crate::DbExecutor;
 use serde::export::PhantomData;
+use std::collections::HashMap;
 
 // TODO: Design a idiomatic way to generate AQL queries,
 
@@ -79,7 +80,7 @@ impl Handler<NewIdea> for DbExecutor {
     type Result = Result<Idea, Error>;
 
     fn handle(&mut self, msg: NewIdea, _ctx: &mut Self::Context) -> Self::Result {
-        #[derive(Deserialize, Serialize, Debug)]
+        #[derive(Deserialize, Serialize, Debug, Default)]
         pub struct IdeaMIN {
             // title of the idea
             pub text: String,
@@ -93,6 +94,7 @@ impl Handler<NewIdea> for DbExecutor {
             pub downvotes: u32,
             pub tags: Vec<String>,
 //            pub date: i64,
+			pub votes : HashMap<String, bool>
         }
 
         let conn = self.0.get().unwrap();
@@ -101,26 +103,31 @@ impl Handler<NewIdea> for DbExecutor {
             text: msg.text.clone(),
             tags: msg.tags.clone(),
             owner: Owner::get_owner(msg.owner_id, &conn).expect("Fail to get owner details."),
-            upvotes: 0,
-            downvotes: 0,
-//            date: Utc::now().timestamp_millis(),
+           ..IdeaMIN::default()
         };
 
         let data = serde_json::to_value(&new_idea).unwrap();
 
-        let query = format!(
+        let mut query = format!(
 	        "let tags = (for t in {data}.tags return Document('tags', t))
             INSERT MERGE({data}, {{date: DATE_NOW()}}) INTO {collection} LET idea = NEW
-			INSERT {{ _from: idea.id, _to: {owner} }} IN Idea_owner
-            RETURN FIRST (FOR tag IN tags
-            UPDATE tag WITH {{count : tag.count + 1}} IN tags
-            INSERT {{ _from: tag._id, _to: idea._id }} INTO tag_to_idea
-            RETURN idea)
+			INSERT {{ _from: idea._id, _to: '{owner}' }} INTO idea_owner
             ",
 	        data = data,
 	        collection = "ideas",
 	        owner = format!("users/{}", new_idea.owner.id)
         );
+
+	    if msg.tags.is_empty() {
+		    query.push_str(" RETURN idea");
+	    } else {
+		    query.push_str(" RETURN FIRST (FOR tag IN tags
+            UPDATE tag WITH {count : tag.count + 1} IN tags
+            INSERT { _from: tag._id, _to: idea._id } INTO tag_to_idea
+            RETURN idea)");
+	    }
+
+	    dbg!(&query);
 
         let aql = AqlQuery::new(&query).batch_size(1);
         let response: Idea = conn

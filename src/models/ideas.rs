@@ -3,6 +3,7 @@ use r2d2::PooledConnection;
 use r2d2_arangodb::ArangodbConnectionManager;
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::{HashMap, BTreeMap};
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
@@ -66,6 +67,9 @@ pub struct Idea {
     pub tags: Vec<String>,
 
     pub date: i64,
+
+ 	#[serde(default)]
+	pub voters : Option<HashMap<String, bool>>
 }
 
 #[derive(Debug, Clone)]

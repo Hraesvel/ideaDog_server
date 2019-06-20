@@ -214,9 +214,10 @@ impl Handler<Pending> for DbExecutor {
 		println!("handle");
 
 		// Check if the prompt exists and has been answered.
-		let client = approveapi::create_client(
-			env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"), );
-		let answer = client.get_prompt(&msg.prompt_id, false).sync();
+//		let client = approveapi::create_client(
+//			env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"), );
+//		let answer = client.get_prompt(&msg.prompt_id, false).sync();
+
 
 //		match answer {
 //			Ok(prompt) => {
