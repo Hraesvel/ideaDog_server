@@ -12,12 +12,13 @@ pub struct AuthMiddleware;
 
 impl Middleware<AppState> for AuthMiddleware {
 	fn start(&self, req: &HttpRequest<AppState>) -> Result<Started> {
-		if req.method() == "OPTIONS" {
+
+
+		if req.method() == "OPTIONS" || req.method()  == "GET" {
 			return Ok(Started::Done);
 		}
 
 		let state: &AppState = req.state();
-
 
 		let token = req
 			.headers()
@@ -25,20 +26,13 @@ impl Middleware<AppState> for AuthMiddleware {
 			.map(|value| value.to_str().ok())
 			.ok_or(ServiceError::Unauthorised)?;
 
-
-		let cookie = req
-			.cookie("bearer");
-
-		let token = cookie;
-
 		match token {
 			Some(t) => {
-//				let mut token = t.split(" ").map(|x| x.to_string()).collect::<Vec<String>>();
-//				verify_token(token.pop().unwrap().to_owned(), state)
-				let value = dbg!(t.value());
-				return verify_token(value.to_string(), state)
+				let mut token = t.split(" ").map(|x| x.to_string()).collect::<Vec<String>>();
+				verify_token(token.pop().unwrap().to_owned(), state)
 			},
-			None => Err(ServiceError::Unauthorised.into()),
+			None => {
+				Err(ServiceError::Unauthorised.into())},
 		}
 	}
 }
@@ -56,11 +50,9 @@ fn verify_token(token: String, state: &AppState) -> Result<Started> {
 		.from_err()
 		.and_then(|res| match res {
 			true =>  {
-				println!("woot");
 				Ok(Started::Done)
 			},
 			false => {
-				println!("what the?!");
 				Err(ServiceError::Unauthorised.into())},
 		})
 		.wait();
@@ -98,7 +90,7 @@ impl Handler<Verify> for DbExecutor {
 			.bind_var("tok", msg.0.clone())
 			.batch_size(1);
 
-		let response = dbg!(conn.aql_query(aql).unwrap());
+		let response = conn.aql_query(aql).unwrap();
 		response[0]
 	}
 }

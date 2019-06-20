@@ -127,8 +127,6 @@ impl Handler<NewIdea> for DbExecutor {
             RETURN idea)");
 	    }
 
-	    dbg!(&query);
-
         let aql = AqlQuery::new(&query).batch_size(1);
         let response: Idea = conn
             .aql_query(aql)

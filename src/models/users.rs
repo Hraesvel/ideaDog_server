@@ -32,8 +32,8 @@ pub struct QUserParams {
 
 
 pub enum QUser {
-	TOKEN(String, QUserParams),
-	ID(String, QUserParams),
+	TOKEN(String),
+	ID(String),
 }
 
 #[derive(Debug, Serialize, Default, Clone)]
