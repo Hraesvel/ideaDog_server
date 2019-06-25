@@ -169,8 +169,11 @@ fn set_login((challenge, state): (Json<Pending>, State<AppState>)) -> FutureResp
 	    .from_err()
 	    .and_then(|res| match res {
             Ok(v) => {
-                let cookie = Cookie::new("bearer", v.clone().unwrap().token);
-                return Ok(HttpResponse::Ok()
+                let cookie = Cookie::build("bearer", v.clone().unwrap().token)
+	                .http_only(true)
+	                .finish();
+
+	            return Ok(HttpResponse::Ok()
                     .cookie(cookie)
                     .json(serde_json::to_value(&v.unwrap()).unwrap())
                     );
@@ -211,9 +214,10 @@ impl Handler<Pending> for DbExecutor {
 		println!("handle");
 
 		// Check if the prompt exists and has been answered.
-		let client = approveapi::create_client(
-			env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"), );
-		let answer = client.get_prompt(&msg.prompt_id, false).sync();
+//		let client = approveapi::create_client(
+//			env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"), );
+//		let answer = client.get_prompt(&msg.prompt_id, false).sync();
+
 
 //		match answer {
 //			Ok(prompt) => {

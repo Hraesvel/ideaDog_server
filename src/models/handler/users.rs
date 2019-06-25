@@ -45,14 +45,14 @@ impl Handler<QUser> for DbExecutor {
 		let mut aql = AqlQuery::new("");
 
 		match msg {
-			QUser::TOKEN(tok, param) => {
+			QUser::TOKEN(tok) => {
 				aql = AqlQuery::new(
 					"FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u",
 				)
 					.bind_var("ele", tok.clone())
 					.batch_size(1);
 			},
-			QUser::ID(id, param) => {
+			QUser::ID(id) => {
 				aql = AqlQuery::new(
 					"RETURN DOCUMENT('users', @ele)"
 				)
