@@ -1,5 +1,11 @@
-# IdeaDog Server
-[![Build status](https://ci.appveyor.com/api/projects/status/jramqn9wwm2qk13j/branch/master?svg=true)](https://ci.appveyor.com/project/Ostoyae/ideadog-server/branch/master)
+# IdeaDog Server [![Build status](https://ci.appveyor.com/api/projects/status/jramqn9wwm2qk13j/branch/master?svg=true)](https://ci.appveyor.com/project/Ostoyae/ideadog-server/branch/master)
+
+## Articles :newspaper:
+
+Here's a great article writen by my partner [Brennan D Baraban](https://github.com/bdbaraban) that gives an overview of the project.
+
+https://medium.com/@bdov_/aeb3a6dcf04f
+
 
 ## Description :bulb:
 
