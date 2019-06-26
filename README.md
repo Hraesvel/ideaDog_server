@@ -4,7 +4,7 @@
 
 Here's a great article writen by my partner [Brennan D Baraban](https://github.com/bdbaraban) that gives an overview of the project.
 
-https://medium.com/@bdov_/aeb3a6dcf04f
+[Introducing IdeaDog — A [Statically-Typed] Social Ideas Platform](https://medium.com/@bdov_/introducing-ideadog-a-statically-typed-social-ideas-platform-aeb3a6dcf04f)
 
 
 ## Description :bulb:
