@@ -21,8 +21,9 @@ impl Handler<QueryUser> for DbExecutor {
 				"
 let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
 let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter
-RETURN {[v._key]: e.vote } )
-return Merge(u, {votes: votes})",
+RETURN {[v._key]: e.vote })
+return Merge(u, {votes: MERGE(votes)})
+"
 			)
 				.bind_var("ele", t.clone())
 				.batch_size(1);
@@ -53,7 +54,12 @@ impl Handler<QUser> for DbExecutor {
 		match msg {
 			QUser::TOKEN(tok) => {
 				aql = AqlQuery::new(
-					"FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u",
+					"
+let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
+let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter
+RETURN {[v._key]: e.vote })
+return Merge(u, {votes: MERGE(votes)})
+",
 				)
 					.bind_var("ele", tok.clone())
 					.batch_size(1);
