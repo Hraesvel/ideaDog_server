@@ -1,6 +1,5 @@
 use crate::AppState;
 
-use crate::midware::ServiceError;
 use crate::util::user::extract_token;
 use crate::AuthMiddleware;
 use actix_web::actix::{Handler, Message, MailboxError};
@@ -10,13 +9,11 @@ use actix_web::{AsyncResponder, Path};
 use arangors::AqlQuery;
 use futures;
 use futures::future::{err, Future, ok};
-use ideadog::{DbExecutor, NewIdea, QueryIdea, Sort, Idea};
+use ideadog::{DbExecutor, NewIdea, QueryIdea, Sort, Idea, ServiceError};
 use serde::Deserialize;
 use serde_json::Value;
 use std::f32::consts::E;
 use toml::map::Values;
-use crate::midware::ServiceError::BadRequest;
-
 //use actix_web::ws::Message;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
@@ -196,8 +193,7 @@ fn update_idea_id((req, path, state): (HttpRequest<AppState> ,Path<(String,Strin
                 "upvote" => Ok(vote),
                 "downvote" => Ok(vote),
                 _ => {
-                    println!("A");
-                    Err(ServiceError::BadRequest.into())
+                    Err(ServiceError::NotFound.into())
                 }
             }
         })
@@ -223,8 +219,7 @@ fn update_idea_id((req, path, state): (HttpRequest<AppState> ,Path<(String,Strin
                 .and_then(|res| match res {
                     Ok(_) => Ok(HttpResponse::Ok().finish()),
                     Err(_) =>{
-                        println!("here?");
-                        Err(ServiceError::BadRequest.into())
+                        Err(ServiceError::NotFound.into())
                     }
                 })
         }
@@ -243,7 +238,7 @@ impl Handler<UserVote> for DbExecutor {
 
         let aql = AqlQuery::new(
             "LET user = FIRST (for u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @token) bearer_to_user RETURN u)
-                LET idea_id = CONCAT('ideas/', @id)
+                LET idea_id = DOCUMENT('ideas', @id)._id
                 UPSERT { _from: idea_id , _to: user._id }
                 INSERT { _from: idea_id , _to: user._id, vote: @vote }
                 UPDATE { vote: @vote } IN idea_voter LET vote = NEW
@@ -256,11 +251,11 @@ impl Handler<UserVote> for DbExecutor {
         let response: Result<Value, MailboxError> = match conn.aql_query(aql) {
             Ok(mut r) => Ok(r.pop().unwrap()),
             Err(e) => {
-                println!("Error: {}", e);
+                //println!("Error: {}", e);
                 Err(MailboxError::Closed)}
         };
 
-        dbg!(response)
+        response
 	}
 }
 

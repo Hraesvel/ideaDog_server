@@ -97,7 +97,7 @@ fn run_query(qufigs: QUser, state: State<AppState>) -> FutureResponse<HttpRespon
         .from_err()
         .and_then(|res| match res {
             Ok(user) => Ok(HttpResponse::Ok().json(user)),
-            Err(_) => Ok(HttpResponse::InternalServerError().into()),
+            Err(_) => Ok(HttpResponse::BadRequest().into()),
         })
         .responder()
 }
