@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct User {
@@ -15,6 +16,9 @@ pub struct User {
 	pub favorite: String,
 	pub upvotes: u32,
 	pub downvotes: u32,
+
+	#[serde(default)]
+	pub votes: Option<HashMap<String, String>>,
 	pub created_at: i64,
 }
 
