@@ -13,6 +13,8 @@ use futures::future::{err, Future};
 use ideadog::{DbExecutor, NewIdea, QueryIdea, Sort, Idea};
 use serde::Deserialize;
 use serde_json::Value;
+use std::intrinsics::min_align_of;
+use actix_net::service::ServiceExt;
 
 //use actix_web::ws::Message;
 
@@ -37,10 +39,15 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
                 r.method(Method::POST).with(create_idea);
             })
             .resource("/{id}", |r| {
-                //				   r.middleware(AuthMiddleware);
+	            r.middleware(AuthMiddleware);
                 r.method(Method::GET).with(get_idea_id);
                 r.method(Method::DELETE).with(delete_idea_id);
             })
+	        .resource("/{id}/{vote}", |r| {
+		        r.middleware(AuthMiddleware);
+		        r.method(Method::POST).with(update_idea_id);
+	        })
+
     })
 }
 
@@ -160,6 +167,44 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
             Err(_) => Ok(HttpResponse::InternalServerError().into()),
         })
         .responder()
+}
+
+enum Vote {
+	UPVOTE,
+	DOWNVOTE,
+}
+
+struct UserVote(Vote);
+
+fn update_idea_id((path, state): (Path<(String,String)>, State<AppState>)) -> FutureResponse<HttpResponse>{
+	let (id, vote) = path.into_inner();
+
+	let v = match vote.as_ref() {
+		"upvote" => Vote::UPVOTE,
+		"downvote" => Vote::DOWNVOTE,
+		_ => return Ok(HttpResponse::NotFound())
+	};
+
+	state
+		.database
+		.send(UserVote(v))
+		.from_err()
+		.and_then(|res| match res {
+			Ok(_) => Ok(HttpResponse::Ok().finish()),
+			Err(_) => Err(ServiceError::BadRequest)
+		})
+}
+
+impl Message for UserVote {
+	type Result = Result<(), ServiceError>;
+}
+
+impl Handler<UserVote> for DbExecutor {
+	type Result = Result<(), ServiceError>;
+
+	fn handle(&mut self, msg: UserVote, ctx: &mut Self::Context) -> Self::Result {
+		Ok(())
+	}
 }
 
 fn delete_idea_id(
