@@ -1,19 +1,19 @@
 use crate::AppState;
 
-use crate::midware::ServiceError;
 use crate::util::user::extract_token;
 use crate::AuthMiddleware;
 use actix_web::actix::{Handler, Message, MailboxError};
 use actix_web::http::{Method, NormalizePath, StatusCode};
-use actix_web::{App, FutureResponse, HttpRequest, HttpResponse, Json, Query, State};
+use actix_web::{App, FutureResponse, HttpRequest, HttpResponse, Json, Query, State, Error};
 use actix_web::{AsyncResponder, Path};
 use arangors::AqlQuery;
 use futures;
-use futures::future::{err, Future};
-use ideadog::{DbExecutor, NewIdea, QueryIdea, Sort, Idea};
+use futures::future::{err, Future, ok};
+use ideadog::{DbExecutor, NewIdea, QueryIdea, Sort, Idea, ServiceError};
 use serde::Deserialize;
 use serde_json::Value;
-
+use std::f32::consts::E;
+use toml::map::Values;
 //use actix_web::ws::Message;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
@@ -37,10 +37,15 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
                 r.method(Method::POST).with(create_idea);
             })
             .resource("/{id}", |r| {
-                //				   r.middleware(AuthMiddleware);
+	            r.middleware(AuthMiddleware);
                 r.method(Method::GET).with(get_idea_id);
                 r.method(Method::DELETE).with(delete_idea_id);
             })
+	        .resource("/{id}/{vote}", |r| {
+		        r.middleware(AuthMiddleware);
+		        r.method(Method::POST).with(update_idea_id);
+	        })
+
     })
 }
 
@@ -160,6 +165,98 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
             Err(_) => Ok(HttpResponse::InternalServerError().into()),
         })
         .responder()
+}
+
+
+#[derive(Clone)]
+struct UserVote{
+    idea_id: String,
+    u_token: String,
+    vote: String
+}
+
+fn update_idea_id((req, path, state): (HttpRequest<AppState> ,Path<(String,String)>, State<AppState>)) -> FutureResponse<HttpResponse>{
+    let current_user = dbg!(extract_token(&req));
+	let (id, vote) = path.into_inner();
+
+//
+//	match vote.as_ref() {
+//		"upvote" => {},
+//		"downvote" => {},
+//		_ => {return err::<HttpResponse, actix_web::error::Error>(ServiceError::BadRequest.into());}
+//	}
+
+
+    ok::<HttpResponse, actix_web::Error>(HttpResponse::Ok().finish())
+        .and_then( |_| {
+            match vote.as_ref() {
+                "upvote" => Ok(vote),
+                "downvote" => Ok(vote),
+                _ => {
+                    Err(ServiceError::NotFound.into())
+                }
+            }
+        })
+        .and_then(move |vote| {
+            let user_vote = if let Some(token) = current_user {
+               Ok( UserVote {
+                    idea_id: id,
+                    u_token: token,
+                    vote
+                })
+            } else {
+
+                Err(ServiceError::BadRequest.into())
+            };
+            user_vote
+        })
+        .from_err()
+        .and_then(move |qufigs| {
+            state
+                .database
+                .send(qufigs)
+                .from_err()
+                .and_then(|res| match res {
+                    Ok(_) => Ok(HttpResponse::Ok().finish()),
+                    Err(_) =>{
+                        Err(ServiceError::NotFound.into())
+                    }
+                })
+        }
+        ).responder()
+}
+
+impl Message for UserVote{
+	type Result = Result<Value, MailboxError>;
+}
+
+impl Handler<UserVote> for DbExecutor {
+	type Result = Result<Value, MailboxError>;
+
+	fn handle(&mut self, msg: UserVote, ctx: &mut Self::Context) -> Self::Result {
+		let conn = self.0.get().unwrap();
+
+        let aql = AqlQuery::new(
+            "LET user = FIRST (for u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @token) bearer_to_user RETURN u)
+                LET idea_id = DOCUMENT('ideas', @id)._id
+                UPSERT { _from: idea_id , _to: user._id }
+                INSERT { _from: idea_id , _to: user._id, vote: @vote }
+                UPDATE { vote: @vote } IN idea_voter LET vote = NEW
+                RETURN NEW"
+        ).batch_size(1)
+            .bind_var("vote", msg.vote)
+            .bind_var("token", msg.u_token)
+            .bind_var("id", msg.idea_id);
+
+        let response: Result<Value, MailboxError> = match conn.aql_query(aql) {
+            Ok(mut r) => Ok(r.pop().unwrap()),
+            Err(e) => {
+                //println!("Error: {}", e);
+                Err(MailboxError::Closed)}
+        };
+
+        response
+	}
 }
 
 fn delete_idea_id(
