@@ -2,11 +2,11 @@ use crate::AppState;
 use actix_web::actix::{Handler, Message};
 use actix_web::middleware::{Middleware, Started};
 use actix_web::HttpRequest;
-use actix_web::{AsyncResponder, HttpResponse, ResponseError, Result};
+use actix_web::{HttpResponse, ResponseError, Result};
 use arangors::AqlQuery;
 use futures::future::Future;
-use ideadog::{DbExecutor, User};
-use r2d2;
+use ideadog::{DbExecutor};
+
 
 pub struct AuthMiddleware;
 
@@ -78,7 +78,7 @@ impl Message for Verify {
 impl Handler<Verify> for DbExecutor {
     type Result = bool;
 
-    fn handle(&mut self, msg: Verify, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Verify, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
         let aql = AqlQuery::new("RETURN IS_DOCUMENT(DOCUMENT('bearer_tokens', @tok))")
             .bind_var("tok", msg.0.clone())

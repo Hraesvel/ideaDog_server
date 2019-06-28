@@ -1,10 +1,10 @@
 use crate::AppState;
 
 use actix_web::http::Method;
-use actix_web::{App, FutureResponse, HttpResponse, Query, State};
+use actix_web::{App, FutureResponse, HttpResponse, State};
 use actix_web::{AsyncResponder, Path};
 use futures::future::Future;
-use ideadog::{QueryTag, Sort, Tag};
+use ideadog::{QueryTag, Sort};
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/tags", |scope| {

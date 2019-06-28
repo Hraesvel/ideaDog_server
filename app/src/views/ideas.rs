@@ -4,7 +4,7 @@ use crate::util::user::extract_token;
 use crate::AuthMiddleware;
 use actix_web::actix::{Handler, MailboxError, Message};
 use actix_web::http::{Method, NormalizePath, StatusCode};
-use actix_web::{App, Error, FutureResponse, HttpRequest, HttpResponse, Json, Query, State};
+use actix_web::{App, FutureResponse, HttpRequest, HttpResponse, Json, Query, State};
 use actix_web::{AsyncResponder, Path};
 use arangors::AqlQuery;
 use futures;
@@ -12,8 +12,8 @@ use futures::future::{err, ok, Future};
 use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort};
 use serde::Deserialize;
 use serde_json::Value;
-use std::f32::consts::E;
-use toml::map::Values;
+
+
 //use actix_web::ws::Message;
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
@@ -229,7 +229,7 @@ impl Message for UserVote {
 impl Handler<UserVote> for DbExecutor {
     type Result = Result<Value, MailboxError>;
 
-    fn handle(&mut self, msg: UserVote, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: UserVote, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
         let aql = AqlQuery::new(
@@ -246,7 +246,7 @@ impl Handler<UserVote> for DbExecutor {
 
         let response: Result<Value, MailboxError> = match conn.aql_query(aql) {
             Ok(mut r) => Ok(r.pop().unwrap()),
-            Err(e) => {
+            Err(_e) => {
                 //println!("Error: {}", e);
                 Err(MailboxError::Closed)
             }
@@ -315,7 +315,7 @@ impl Handler<DeleteIdea> for DbExecutor {
             _ => None,
         };
 
-        if let Some(r) = response {
+        if let Some(_r) = response {
             return Ok(());
         } else {
             return Err(MailboxError::Closed);
