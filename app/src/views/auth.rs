@@ -1,4 +1,4 @@
-use crate::views::users::{create_user, SignUp};
+use crate::views::users::{create_user};
 use crate::{midware::ServiceError, AppState, DbExecutor};
 use actix::MailboxError;
 use actix_web::actix;
@@ -8,19 +8,19 @@ use actix_web::{
     App, AsyncResponder, Form, FutureResponse, HttpRequest, HttpResponse, Json, Responder, Result,
     State,
 };
-use approveapi::*;
+
 use arangors::AqlQuery;
 use chrono::Utc;
-use failure::Error;
+
 use futures::future::Future;
-use ideadog::{Challenge, Login, Signup};
+use ideadog::{Challenge, Login};
 use rand;
 use rand::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::env;
-use std::time::Duration;
+
+
 
 #[derive(Deserialize, Debug, Serialize)]
 pub struct Token {
@@ -114,7 +114,7 @@ fn set_login((challenge, state): (Json<Pending>, State<AppState>)) -> FutureResp
     dbg!(&challenge);
     let res = state
         .database
-        .send((challenge.into_inner()))
+        .send(challenge.into_inner())
         .from_err()
         .and_then(|res| match res {
             Ok(v) => {
@@ -155,7 +155,7 @@ impl Handler<Pending> for DbExecutor {
     type Result = Result<Option<Bearer>, ServiceError>;
 
     /// Handles the process for validating a `Challenge` token
-    fn handle(&mut self, msg: Pending, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Pending, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
         println!("handle");

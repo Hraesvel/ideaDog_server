@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate failure;
 use actix_web::actix::{Addr, SyncArbiter};
-use actix_web::http::{header, NormalizePath, StatusCode};
+use actix_web::http::{header, NormalizePath};
 use actix_web::middleware::cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::{actix, server, App, HttpRequest, Responder};
@@ -103,6 +103,7 @@ fn main() {
         .configure(views::tags::config)
         .configure(views::users::config)
         .configure(views::auth::config)
+        .configure(views::search::config)
         .finish()
     })
     .bind(hostname.clone())

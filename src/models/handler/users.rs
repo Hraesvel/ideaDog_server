@@ -7,6 +7,7 @@ use r2d2::Error;
 use serde_json;
 
 use crate::{DbExecutor, NewUser, QUser, QueryUser, ServiceError, User};
+use std::collections::HashMap;
 
 impl Handler<QueryUser> for DbExecutor {
     type Result = Result<User, MailboxError>;
@@ -18,10 +19,9 @@ impl Handler<QueryUser> for DbExecutor {
 
         if let Some(t) = msg.token {
             aql = AqlQuery::new(
-                "
+"
 let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
-let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter
-RETURN {[v._key]: e.vote })
+let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
 return Merge(u, {votes: MERGE(votes)})
 ",
             )
@@ -58,10 +58,9 @@ impl Handler<QUser> for DbExecutor {
         match msg {
             QUser::TOKEN(tok) => {
                 aql = AqlQuery::new(
-                    "
+"
 let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
-let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter
-RETURN {[v._key]: e.vote })
+let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
 return Merge(u, {votes: MERGE(votes)})
 ",
                 )
@@ -77,16 +76,24 @@ return Merge(u, {votes: MERGE(votes)})
 
         let response: Result<User, MailboxError> = match conn.aql_query(aql) {
             Ok(mut r) => {
-                if !r.is_empty() {
-                    let user: User = r.pop().unwrap();
-                    //					if user.votes.is_some()
-                    //					let (up, down) =
-
+                let res = if !r.is_empty() {
+                    let mut user: User = r.pop().unwrap();
+                    if user.votes.is_some() {
+                        for v in user.clone().votes.unwrap().values() {
+                            match v.as_ref() {
+                                "upvote" => user.upvotes += 1,
+                                "downvote" => user.downvotes += 1,
+                                _ => {}
+                            }
+                        }
+                    }
                     Ok(user)
-                } else {
+                }else {
                     Err(MailboxError::Closed)
-                }
-            }
+                };
+
+                res
+                },
             Err(e) => {
                 eprintln!("Error: {}", e);
                 Err(MailboxError::Closed)

@@ -1,21 +1,21 @@
-use crate::{util::user, AppState};
+use crate::{AppState};
 
 use crate::midware::AuthMiddleware;
 use crate::util::user::extract_token;
 use crate::views::auth::{challenge_gen, exist_user, login, ttl, Token};
 use actix_web::actix::{Handler, Message};
-use actix_web::http::header::q;
+
 use actix_web::http::{Method, NormalizePath, StatusCode};
-use actix_web::{App, FutureResponse, HttpResponse, Path, Query, Responder, State};
+use actix_web::{App, FutureResponse, HttpResponse, Path, State};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use arangors::AqlQuery;
 use chrono::Utc;
 use futures::future::{err, ok, Future, IntoFuture};
-use ideadog::{Challenge, DbExecutor, Idea, Login, NewUser, QueryUser};
-use ideadog::{QUser, QUserParams};
+use ideadog::{Challenge, DbExecutor, Idea, Login, NewUser};
+use ideadog::{QUser};
 use r2d2::Error;
 use serde::Deserialize;
-use serde::Serialize;
+
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/user", |scope| {
@@ -70,7 +70,7 @@ impl Message for UIdeas {
 impl Handler<UIdeas> for DbExecutor {
     type Result = Result<Vec<Idea>, Error>;
 
-    fn handle(&mut self, msg: UIdeas, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: UIdeas, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
         let aql = AqlQuery::new(
