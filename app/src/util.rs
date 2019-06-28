@@ -23,3 +23,17 @@ pub mod user {
         token
     }
 }
+
+pub mod idea {
+    use ideadog::Pagination;
+
+    pub fn paginate(offset: Option<u32>, count: Option<u32>) -> Option<Pagination> {
+        let page = if offset.is_some() && count.is_some() {
+            Pagination {
+                count: count.unwrap(),
+                offset : offset.unwrap(),
+            }.into()
+        } else { None };
+        page
+    }
+}

@@ -88,7 +88,7 @@ pub enum Sort {
     ALL,
     BRIGHT,
 }
-
+#[derive(Debug)]
 pub struct QueryIdea {
     pub sort: Sort,
     //id
@@ -100,5 +100,11 @@ pub struct QueryIdea {
     // accept tags for query string
     pub tags: Option<Vec<String>>,
 
-    pub limit: Option<u32>,
+    pub pagination : Option<Pagination>
+}
+
+#[derive(Debug)]
+pub struct Pagination {
+    pub count: u32,
+    pub offset: u32,
 }

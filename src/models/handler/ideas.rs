@@ -55,6 +55,13 @@ impl Handler<QueryIdea> for DbExecutor {
             }
         }
 
+        if let Some(page) = msg.pagination {
+            if page.count > 0 {
+                let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+                query.push_str(page_str.as_str());
+            }
+        }
+
         query.push_str("RETURN ele");
 
         let mut aql = AqlQuery::new(&query).batch_size(50);

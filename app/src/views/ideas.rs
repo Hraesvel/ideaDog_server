@@ -9,9 +9,10 @@ use actix_web::{AsyncResponder, Path};
 use arangors::AqlQuery;
 use futures;
 use futures::future::{err, ok, Future};
-use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort};
+use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort, Pagination};
 use serde::Deserialize;
 use serde_json::Value;
+use crate::util::idea::paginate;
 
 
 //use actix_web::ws::Message;
@@ -52,6 +53,8 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
 struct Param {
     id: Option<String>,
     tags: Option<String>,
+    count: Option<u32>,
+    offset: Option<u32>
 }
 
 #[derive(Deserialize)]
@@ -87,14 +90,17 @@ fn get_ideas_sort(
         vec_of_tags = Some(v_string);
     };
 
+
     let mut q = QueryIdea {
         sort: Sort::ALL,
         id: None,
         owner: None,
         owner_id: None,
         tags: vec_of_tags,
-        limit: None,
+        pagination: None
     };
+
+    q.pagination = paginate(q_string.offset, q_string.count);
 
     match path.into_inner().to_lowercase().as_str() {
         "bright" => q.sort = Sort::BRIGHT,
@@ -110,15 +116,16 @@ fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureRespon
         let v_string: Vec<String> = value.clone().split(',').map(|x| x.to_string()).collect();
         vec_of_tags = Some(v_string);
     };
-
     let mut q = QueryIdea {
         sort: Sort::ALL,
         id: None,
         owner: None,
         owner_id: None,
         tags: vec_of_tags,
-        limit: None,
+        pagination: None
     };
+
+    q.pagination = paginate(q_string.offset, q_string.count);
 
     if let Some(t) = q_string.tags.clone() {
         let tags: Vec<String> = t.split(",").map(|x| x.to_string()).collect();
@@ -135,7 +142,7 @@ fn get_idea_id((path, state): (Path<String>, State<AppState>)) -> FutureResponse
         owner: None,
         owner_id: None,
         tags: None,
-        limit: None,
+        pagination: None
     };
 
     run_query(q, state)
