@@ -63,34 +63,6 @@ pub(crate) fn login((json, state): (Json<Login>, State<AppState>)) -> HttpRespon
 
 }
 
-/// performs the step to generate a ApproveAPI prompt.
-//#[deprecated]
-//pub(crate) fn perform_approve_aip(form: String, state: State<AppState>) -> Result<HttpResponse> {
-//
-//    let ttl = ttl(15);
-//    let c = challenge_gen(32);
-//    let challenge = Challenge {
-//        challenge: c,
-//        email: form.clone(),
-//        username: None,
-//        pending: true,
-//        ttl,
-//    };
-//
-//    let r = state
-//        .database
-//        // added challenge to database
-//        .send(challenge.clone())
-//        .from_err()
-//        .and_then(|res| match res {
-//            Ok(_) => send_magic_link(challenge, state),
-//            Err(_) => Ok(HttpResponse::Unauthorized().finish()),
-//        })
-//        .wait();
-//
-//    r
-//}
-
 /// Generates a UTC timestamp in milliseconds +/- mins given.
 pub(crate) fn ttl(mins: i64) -> i64 {
     let ttl = (mins * 60000) + Utc::now().timestamp_millis();
@@ -124,39 +96,10 @@ pub(crate) fn exist_user(email: String, state: &State<AppState>) -> Result<(), M
 
 }
 
-/// This Function will send a magic link to the user's email provided at login/signup.
-///
-/// # Note
-/// This function will unlikely be use in production and is purely for demo purposes if the front-end isn't acceptable
-///
-///
-//fn send_magic_link(challenge: Challenge, state: State<AppState>) -> Result<HttpResponse> {
-//    let client = approveapi::create_client(
-//        env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"),
-//    );
-//
-//    let mut prompt_request = CreatePromptRequest::new(
-//        challenge.email.clone(),
-//        r#"Click the link below to Sign in to your account.
-//		This link will expire in 15 mintues."#
-//            .to_string(),
-//    );
-//    prompt_request.title = Some("Magic sign-in link".to_string());
-//    prompt_request.approve_text = Some("Accept".to_string());
-//    prompt_request.reject_text = Some("Reject".to_string());
-//
-//    prompt_request.reject_redirect_url = Some(env::var("REDIRECT_URL").expect("IDEADOG_HOME must be set"));
-//
-//    client.create_prompt(prompt_request).map_err(|e| {
-//        eprintln!("approveapi error: {:?}", e);
-//        return Ok(HttpResponse::BadRequest().finish())
-//    })
-//
-//}
 #[derive(Deserialize, Debug)]
 struct Pending {
 	token: String,
-	prompt_id: String,
+
 }
 
 /// This function will take a `Challenge` token from the user and compare to the one stored in the Database.
@@ -212,29 +155,6 @@ impl Handler<Pending> for DbExecutor {
         let conn = self.0.get().unwrap();
 
 		println!("handle");
-
-		// Check if the prompt exists and has been answered.
-//		let client = approveapi::create_client(
-//			env::var("APPROVEAPI_TEST_KEY").expect("APPROVEAPI_TEST_KEY must be set!"), );
-//		let answer = client.get_prompt(&msg.prompt_id, false).sync();
-
-
-//		match answer {
-//			Ok(prompt) => {
-//				if let Some(answer) = prompt.answer {
-//					if answer.result {
-//						println!("Request is Approved");
-//					} else {
-//						println!("Request was Rejected");
-//						return Err(ServiceError::Unauthorised)
-//					}
-//					println!("timeout");
-//					return Err(ServiceError::Unauthorised)
-//				}
-//			},
-//			_ => return Err(ServiceError::BadRequest)
-//		}
-
 
         let bearer = Bearer {
             token: challenge_gen(64),

@@ -20,9 +20,9 @@ impl Handler<QueryUser> for DbExecutor {
 			aql = AqlQuery::new(
 				"
 let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
-let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter
-RETURN {[v._key]: e.vote })
-return Merge(u, {votes: MERGE(votes)})
+let ideas = (FOR i in 1..1 INBOUND u._id idea_owner return {[i._key]: 'true'})
+let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
+return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
 "
 			)
 				.bind_var("ele", t.clone())
@@ -56,9 +56,9 @@ impl Handler<QUser> for DbExecutor {
 				aql = AqlQuery::new(
 					"
 let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
-let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter
-RETURN {[v._key]: e.vote })
-return Merge(u, {votes: MERGE(votes)})
+let ideas = (FOR i in 1..1 INBOUND u._id idea_owner return {[i._key]: 'true'})
+let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
+return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
 ",
 				)
 					.bind_var("ele", tok.clone())
@@ -73,13 +73,6 @@ return Merge(u, {votes: MERGE(votes)})
 			},
 		}
 
-//		let response: Vec<User> = match conn.aql_query(aql) {
-//			Ok(r) => r,
-//			Err(e) => {
-//				println!("Error: {}", e);
-//				vec![]
-//			}
-//		};
 		let response: Result<User, MailboxError>  = match conn.aql_query(aql) {
 			Ok(mut r) => {
 				if !r.is_empty() { Ok(r.pop().unwrap()) } else { Err(MailboxError::Closed)}

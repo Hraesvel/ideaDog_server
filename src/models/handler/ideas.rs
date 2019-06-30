@@ -3,6 +3,8 @@ use arangors;
 use arangors::AqlQuery;
 use chrono::Utc;
 use r2d2::Error;
+use reqwest;
+
 
 use serde::{Deserialize, Serialize};
 

@@ -11,7 +11,8 @@ pub struct User {
 	#[serde(alias = "name")]
 	pub username: String,
 	pub email: String,
-	pub ideas: Vec<String>,
+	#[serde(default)]
+	pub ideas: HashMap<String, String>,
 	pub active: bool,
 	pub favorite: String,
 	pub upvotes: u32,

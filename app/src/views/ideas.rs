@@ -179,14 +179,6 @@ fn update_idea_id((req, path, state): (HttpRequest<AppState> ,Path<(String,Strin
     let current_user = dbg!(extract_token(&req));
 	let (id, vote) = path.into_inner();
 
-//
-//	match vote.as_ref() {
-//		"upvote" => {},
-//		"downvote" => {},
-//		_ => {return err::<HttpResponse, actix_web::error::Error>(ServiceError::BadRequest.into());}
-//	}
-
-
     ok::<HttpResponse, actix_web::Error>(HttpResponse::Ok().finish())
         .and_then( |_| {
             match vote.as_ref() {
@@ -235,6 +227,10 @@ impl Handler<UserVote> for DbExecutor {
 
 	fn handle(&mut self, msg: UserVote, ctx: &mut Self::Context) -> Self::Result {
 		let conn = self.0.get().unwrap();
+
+//		let req = reqwest::Client::new();
+//		let url = format!();
+//		req.post()
 
         let aql = AqlQuery::new(
             "LET user = FIRST (for u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @token) bearer_to_user RETURN u)
