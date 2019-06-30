@@ -6,5 +6,5 @@ use actix::{Actor, SyncContext};
 pub struct DbExecutor(pub Pool<ArangodbConnectionManager>);
 
 impl Actor for DbExecutor {
-	type Context = SyncContext<Self>;
+    type Context = SyncContext<Self>;
 }

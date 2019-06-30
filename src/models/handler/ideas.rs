@@ -17,21 +17,21 @@ use std::collections::HashMap;
 
 // Prototype for generating AQL queries as a stack
 struct ArangoQuery<SORT> {
-	collection: String,
-	filters: Option<Vec<String>>,
-	limit: Option<String>,
-	sort: Option<SORT>,
-	sub_query: Option<Box<ArangoQuery<SORT>>>
+    collection: String,
+    filters: Option<Vec<String>>,
+    limit: Option<String>,
+    sort: Option<SORT>,
+    sub_query: Option<Box<ArangoQuery<SORT>>>,
 }
 
 /// Generates a AQL FILTER line to be appended
 fn filter_with(data: Vec<String>) -> String {
     let mut q_string = "FILTER ".to_string();
-	let s = data
-		.iter()
-		.map(|x| format!("'{}' IN ele.tags ", x))
-		.collect::<Vec<String>>()
-		.join(" AND ");
+    let s = data
+        .iter()
+        .map(|x| format!("'{}' IN ele.tags ", x))
+        .collect::<Vec<String>>()
+        .join(" AND ");
 
     q_string.push_str(s.as_str());
     q_string
@@ -52,14 +52,21 @@ impl Handler<QueryIdea> for DbExecutor {
         // Handles Sort
         match &msg.sort {
             Sort::ALL => query.push_str("SORT ele.date DESC "),
-	        Sort::BRIGHT => {
-		        query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
-	        }
+            Sort::BRIGHT => {
+                query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
+            }
+        }
+
+        if let Some(page) = msg.pagination {
+            if page.count > 0 {
+                let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+                query.push_str(page_str.as_str());
+            }
         }
 
         query.push_str("RETURN ele");
 
-	    let mut aql = AqlQuery::new(&query).batch_size(50);
+        let mut aql = AqlQuery::new(&query).batch_size(50);
 
         if let Some(id) = msg.id {
             aql = AqlQuery::new("RETURN DOCUMENT(CONCAT('ideas/', @id ))")
@@ -95,8 +102,8 @@ impl Handler<NewIdea> for DbExecutor {
             #[serde(default)]
             pub downvotes: u32,
             pub tags: Vec<String>,
-//            pub date: i64,
-			pub votes : HashMap<String, bool>
+            //            pub date: i64,
+            pub votes: HashMap<String, bool>,
         }
 
         let conn = self.0.get().unwrap();
@@ -105,29 +112,31 @@ impl Handler<NewIdea> for DbExecutor {
             text: msg.text.clone(),
             tags: msg.tags.clone(),
             owner: Owner::get_owner(msg.owner_id, &conn).expect("Fail to get owner details."),
-           ..IdeaMIN::default()
+            ..IdeaMIN::default()
         };
 
         let data = serde_json::to_value(&new_idea).unwrap();
 
         let mut query = format!(
-	        "let tags = (for t in {data}.tags return Document('tags', t))
+            "let tags = (for t in {data}.tags return Document('tags', t))
             INSERT MERGE({data}, {{date: DATE_NOW()}}) INTO {collection} LET idea = NEW
 			INSERT {{ _from: idea._id, _to: '{owner}' }} INTO idea_owner
             ",
-	        data = data,
-	        collection = "ideas",
-	        owner = format!("users/{}", new_idea.owner.id)
+            data = data,
+            collection = "ideas",
+            owner = format!("users/{}", new_idea.owner.id)
         );
 
-	    if msg.tags.is_empty() {
-		    query.push_str(" RETURN idea");
-	    } else {
-		    query.push_str(" RETURN FIRST (FOR tag IN tags
+        if msg.tags.is_empty() {
+            query.push_str(" RETURN idea");
+        } else {
+            query.push_str(
+                " RETURN FIRST (FOR tag IN tags
             UPDATE tag WITH {count : tag.count + 1} IN tags
             INSERT { _from: tag._id, _to: idea._id } INTO tag_to_idea
-            RETURN idea)");
-	    }
+            RETURN idea)",
+            );
+        }
 
         let aql = AqlQuery::new(&query).batch_size(1);
         let response: Idea = conn

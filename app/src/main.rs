@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate failure;
 use actix_web::actix::{Addr, SyncArbiter};
-use actix_web::http::{header, NormalizePath, StatusCode};
+use actix_web::http::{header, NormalizePath};
 use actix_web::middleware::cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::{actix, server, App, HttpRequest, Responder};
@@ -14,8 +14,8 @@ use std::env;
 use midware::AuthMiddleware;
 //routes
 mod midware;
-mod views;
 mod util;
+mod views;
 //mod ideas;
 
 pub struct AppState {
@@ -68,48 +68,56 @@ fn main() {
         .expect("Failed to create pool");
 
     //create the SyncArbiters for r2d2
-	let arbiter_cores = env::var("ARBITER_THREAD").expect("ARBITER_THREAD must be set").parse::<usize>().unwrap_or_else(|_| {
-		eprintln!("ARBITER_THREAD must be a valid number defaulting to 1");
-		1
-	});
-	let addr = SyncArbiter::start(arbiter_cores, move || DbExecutor(pool.clone()));
+    let arbiter_cores = env::var("ARBITER_THREAD")
+        .expect("ARBITER_THREAD must be set")
+        .parse::<usize>()
+        .unwrap_or_else(|_| {
+            eprintln!("ARBITER_THREAD must be a valid number defaulting to 1");
+            1
+        });
+    let addr = SyncArbiter::start(arbiter_cores, move || DbExecutor(pool.clone()));
 
     server::new(move || {
         let cors = Cors::build()
-	        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
-	        .allowed_headers(vec![
-		        header::CONTENT_TYPE,
-		        header::AUTHORIZATION,
-		        header::ACCEPT,
-		        header::ORIGIN,
-	        ])
-	        .supports_credentials()
-	        .max_age(3600)
-	        .finish();
+            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+            .allowed_headers(vec![
+                header::CONTENT_TYPE,
+                header::AUTHORIZATION,
+                header::ACCEPT,
+                header::ORIGIN,
+            ])
+            .supports_credentials()
+            .max_age(3600)
+            .finish();
 
         App::with_state(AppState {
             database: addr.clone(),
         })
-	        .prefix("/api")
-	        .default_resource(|r| r.h(NormalizePath::default()))
-	        .middleware(Logger::default())
-	        .middleware(Logger::new("%a %{User-agent}i"))
-	        .middleware(cors)
-	        .resource("/", |r| r.f(greatings))
-	        .configure(views::ideas::config)
-	        .configure(views::tags::config)
-	        .configure(views::users::config)
-	        .configure(views::auth::config)
-	        .finish()
+        .prefix("/api")
+        .default_resource(|r| r.h(NormalizePath::default()))
+        .middleware(Logger::default())
+        .middleware(Logger::new("%a %{User-agent}i"))
+        .middleware(cors)
+        .resource("/", |r| r.f(greatings))
+        .configure(views::ideas::config)
+        .configure(views::tags::config)
+        .configure(views::users::config)
+        .configure(views::auth::config)
+        .configure(views::search::config)
+        .finish()
     })
-	    .bind(hostname.clone())
-
-	    .unwrap()
-	    .workers(env::var("WORKER").expect("WORKER must be set").parse::<usize>().unwrap_or_else(|_| {
-		    eprintln!("Workers must be a valid number defaulting to 1");
-		    1
-	    }))
-	    .start();
+    .bind(hostname.clone())
+    .unwrap()
+    .workers(
+        env::var("WORKER")
+            .expect("WORKER must be set")
+            .parse::<usize>()
+            .unwrap_or_else(|_| {
+                eprintln!("Workers must be a valid number defaulting to 1");
+                1
+            }),
+    )
+    .start();
 
     println!("Starting http server: {}", hostname);
     let _ = ideadog_system.run();

@@ -1,21 +1,21 @@
-use crate::{AppState, util::user};
+use crate::{AppState};
 
 use crate::midware::AuthMiddleware;
+use crate::util::user::extract_token;
 use crate::views::auth::{challenge_gen, exist_user, login, ttl, Token};
 use actix_web::actix::{Handler, Message};
-use actix_web::http::header::q;
+
 use actix_web::http::{Method, NormalizePath, StatusCode};
-use actix_web::{App, FutureResponse, HttpResponse, Path, Query, Responder, State};
+use actix_web::{App, FutureResponse, HttpResponse, Path, State};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use arangors::AqlQuery;
 use chrono::Utc;
-use futures::future::{ok, Future, IntoFuture, err};
-use ideadog::{Challenge, DbExecutor, Idea, Login, NewUser, QueryUser};
-use ideadog::{QUser, QUserParams};
+use futures::future::{err, ok, Future, IntoFuture};
+use ideadog::{Challenge, DbExecutor, Idea, Login, NewUser};
+use ideadog::{QUser};
 use r2d2::Error;
 use serde::Deserialize;
-use serde::Serialize;
-use crate::util::user::extract_token;
+
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/user", |scope| {
@@ -70,7 +70,7 @@ impl Message for UIdeas {
 impl Handler<UIdeas> for DbExecutor {
     type Result = Result<Vec<Idea>, Error>;
 
-    fn handle(&mut self, msg: UIdeas, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: UIdeas, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
         let aql = AqlQuery::new(
@@ -102,9 +102,7 @@ fn run_query(qufigs: QUser, state: State<AppState>) -> FutureResponse<HttpRespon
         .responder()
 }
 
-fn get_user_by_id(
-    (path, state): (Path<String>, State<AppState>),
-) -> FutureResponse<HttpResponse> {
+fn get_user_by_id((path, state): (Path<String>, State<AppState>)) -> FutureResponse<HttpResponse> {
     let qufig = QUser::ID(path.into_inner());
 
     run_query(qufig, state)
@@ -113,10 +111,8 @@ fn get_user_by_id(
 fn get_user(
     (req, state): (HttpRequest<AppState>, State<AppState>),
 ) -> FutureResponse<HttpResponse> {
-
     let qufig = if let Some(token) = extract_token(&req) {
         QUser::TOKEN(token)
-
     } else {
         QUser::TOKEN("None".to_string())
     };

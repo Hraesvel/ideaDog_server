@@ -4,8 +4,8 @@
 extern crate failure;
 extern crate serde_derive;
 mod database;
-mod models;
 mod error;
+mod models;
 
 pub use database::DbExecutor;
 pub use error::service::ServiceError;
