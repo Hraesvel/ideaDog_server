@@ -12,7 +12,9 @@ pub struct AuthMiddleware;
 
 impl Middleware<AppState> for AuthMiddleware {
 	fn start(&self, req: &HttpRequest<AppState>) -> Result<Started> {
-		if req.method() == "OPTIONS" {
+
+
+		if req.method() == "OPTIONS" || req.method()  == "GET" {
 			return Ok(Started::Done);
 		}
 
@@ -28,8 +30,9 @@ impl Middleware<AppState> for AuthMiddleware {
 			Some(t) => {
 				let mut token = t.split(" ").map(|x| x.to_string()).collect::<Vec<String>>();
 				verify_token(token.pop().unwrap().to_owned(), state)
-			}
-			None => Err(ServiceError::Unauthorised.into()),
+			},
+			None => {
+				Err(ServiceError::Unauthorised.into())},
 		}
 	}
 }
@@ -39,19 +42,20 @@ struct Verify(String);
 /// Verify token function queries the database to see if the provided token
 /// existed in the database
 fn verify_token(token: String, state: &AppState) -> Result<Started> {
-	let t = Verify(token);
+	let tok = Verify(token);
 
-	let conn = state
+	let response = state
 		.database
-		.send(t)
+		.send(tok)
 		.from_err()
 		.and_then(|res| match res {
-			true => return Ok(Started::Done),
-			false => return Err(ServiceError::Unauthorised.into()),
+			true =>  {
+				Ok(Started::Done)
+			},
+			false => {
+				Err(ServiceError::Unauthorised.into())},
 		})
 		.wait();
-
-	let response = conn;
 
 	response
 }

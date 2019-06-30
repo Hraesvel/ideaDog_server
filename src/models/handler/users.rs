@@ -1,4 +1,4 @@
-use actix::Handler;
+use actix::{Handler, MailboxError};
 use arangors;
 use arangors::AqlQuery;
 
@@ -6,10 +6,10 @@ use r2d2::Error;
 
 use serde_json;
 
-use crate::{DbExecutor, NewUser, QueryUser, User, QUser};
+use crate::{DbExecutor, NewUser, QueryUser, User, QUser, ServiceError};
 
 impl Handler<QueryUser> for DbExecutor {
-	type Result = Result<Vec<User>, Error>;
+	type Result = Result<User, MailboxError>;
 
 	fn handle(&mut self, msg: QueryUser, _ctx: &mut Self::Context) -> Self::Result {
 		let conn = self.0.get().unwrap();
@@ -18,26 +18,33 @@ impl Handler<QueryUser> for DbExecutor {
 
 		if let Some(t) = msg.token {
 			aql = AqlQuery::new(
-				"FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u",
+				"
+let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
+let ideas = (FOR i in 1..1 INBOUND u._id idea_owner return {[i._key]: 'true'})
+let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
+return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
+"
 			)
 				.bind_var("ele", t.clone())
 				.batch_size(1);
 		}
 
-		let response: Vec<User> = match conn.aql_query(aql) {
-			Ok(r) => r,
+		let response: Result<User, MailboxError>  = match conn.aql_query(aql) {
+			Ok(mut r) => {
+				if !r.is_empty() { Ok(r.pop().unwrap()) } else { Err(MailboxError::Closed)}
+			},
 			Err(e) => {
 				println!("Error: {}", e);
-				vec![]
+				Err(MailboxError::Closed)
 			}
 		};
 
-		Ok(response)
+		response
 	}
 }
 
 impl Handler<QUser> for DbExecutor {
-	type Result = Result<Vec<User>, Error>;
+	type Result = Result<User, MailboxError>;
 
 	fn handle(&mut self, msg: QUser, _ctx: &mut Self::Context) -> Self::Result {
 		let conn = self.0.get().unwrap();
@@ -45,14 +52,19 @@ impl Handler<QUser> for DbExecutor {
 		let mut aql = AqlQuery::new("");
 
 		match msg {
-			QUser::TOKEN(tok, param) => {
+			QUser::TOKEN(tok) => {
 				aql = AqlQuery::new(
-					"FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u",
+					"
+let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
+let ideas = (FOR i in 1..1 INBOUND u._id idea_owner return {[i._key]: 'true'})
+let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
+return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
+",
 				)
 					.bind_var("ele", tok.clone())
 					.batch_size(1);
 			},
-			QUser::ID(id, param) => {
+			QUser::ID(id) => {
 				aql = AqlQuery::new(
 					"RETURN DOCUMENT('users', @ele)"
 				)
@@ -61,15 +73,17 @@ impl Handler<QUser> for DbExecutor {
 			},
 		}
 
-		let response: Vec<User> = match conn.aql_query(aql) {
-			Ok(r) => r,
+		let response: Result<User, MailboxError>  = match conn.aql_query(aql) {
+			Ok(mut r) => {
+				if !r.is_empty() { Ok(r.pop().unwrap()) } else { Err(MailboxError::Closed)}
+			},
 			Err(e) => {
-				println!("Error: {}", e);
-				vec![]
+				eprintln!("Error: {}", e);
+				Err(MailboxError::Closed)
 			}
 		};
 
-		Ok(response)
+		response
 	}
 }
 

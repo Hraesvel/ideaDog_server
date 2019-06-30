@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct User {
@@ -10,11 +11,15 @@ pub struct User {
 	#[serde(alias = "name")]
 	pub username: String,
 	pub email: String,
-	pub ideas: Vec<String>,
+	#[serde(default)]
+	pub ideas: HashMap<String, String>,
 	pub active: bool,
 	pub favorite: String,
 	pub upvotes: u32,
 	pub downvotes: u32,
+
+	#[serde(default)]
+	pub votes: Option<HashMap<String, String>>,
 	pub created_at: i64,
 }
 
@@ -32,8 +37,8 @@ pub struct QUserParams {
 
 
 pub enum QUser {
-	TOKEN(String, QUserParams),
-	ID(String, QUserParams),
+	TOKEN(String),
+	ID(String),
 }
 
 #[derive(Debug, Serialize, Default, Clone)]

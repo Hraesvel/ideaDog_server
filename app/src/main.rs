@@ -15,6 +15,7 @@ use midware::AuthMiddleware;
 //routes
 mod midware;
 mod views;
+mod util;
 //mod ideas;
 
 pub struct AppState {
@@ -75,7 +76,6 @@ fn main() {
 
     server::new(move || {
         let cors = Cors::build()
-	        //            .send_wildcard()
 	        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
 	        .allowed_headers(vec![
 		        header::CONTENT_TYPE,
