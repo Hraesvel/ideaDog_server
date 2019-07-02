@@ -3,23 +3,24 @@ use r2d2::PooledConnection;
 use r2d2_arangodb::ArangodbConnectionManager;
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::{BTreeMap, HashMap};
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Owner {
-	#[serde(alias = "_key")]
+    #[serde(alias = "_key")]
     pub id: String,
-	#[serde(alias = "name")]
-	pub username: String,
+    #[serde(alias = "name")]
+    pub username: String,
 }
 
 impl Owner {
-	/// This method will fetch Owner (User) from the Database
-	///
-	/// # Errors
-	/// Error occurse if failed to connect to database or Owner (User) doesn't exist
-	///
+    /// This method will fetch Owner (User) from the Database
+    ///
+    /// # Errors
+    /// Error occurse if failed to connect to database or Owner (User) doesn't exist
+    ///
     pub fn get_owner(id: String, conn: &Connection) -> Option<Owner> {
         let ident = if id.contains('/') {
             id
@@ -28,18 +29,18 @@ impl Owner {
         };
 
         let aql = AqlQuery::new("RETURN DOCUMENT(@ident)")
-	        .bind_var("ident", ident)
-	        .batch_size(1);
+            .bind_var("ident", ident)
+            .batch_size(1);
 
-		let owner = match conn.aql_query(aql) {
-			Ok(mut r) => Some(r.pop().unwrap()),
-			Err(e) => {
-				println!("Error: {}", e);
-				None
-			}
-		};
+        let owner = match conn.aql_query(aql) {
+            Ok(mut r) => Some(r.pop().unwrap()),
+            Err(e) => {
+                println!("Error: {}", e);
+                None
+            }
+        };
 
-		owner
+        owner
     }
 }
 
@@ -55,24 +56,27 @@ pub struct Idea {
     pub text: String,
     // description of idea
     // Owner's username
-//    #[serde(skip)]
+    //    #[serde(skip)]
     pub owner: Owner,
     // This field is for the votes.
     #[serde(default)]
     pub upvotes: u32,
-	#[serde(default)]
+    #[serde(default)]
     pub downvotes: u32,
 
     pub tags: Vec<String>,
 
     pub date: i64,
+
+    #[serde(default)]
+    pub voters: Option<HashMap<String, bool>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct NewIdea {
     // title of the idea
     pub text: String,
-	//    #[serde(default="temp_user")]
+    //    #[serde(default="temp_user")]
     // Owner's username
     pub owner_id: String,
 
@@ -85,6 +89,12 @@ pub enum Sort {
     BRIGHT,
 }
 
+impl Default for Sort {
+    fn default() -> Self {
+        Sort::ALL
+    }
+}
+#[derive(Debug, Default)]
 pub struct QueryIdea {
     pub sort: Sort,
     //id
@@ -96,5 +106,13 @@ pub struct QueryIdea {
     // accept tags for query string
     pub tags: Option<Vec<String>>,
 
-    pub limit: Option<u32>,
+    pub pagination : Option<Pagination>,
+    // query search
+    pub query: Option<String>
+}
+
+#[derive(Debug)]
+pub struct Pagination {
+    pub count: u32,
+    pub offset: u32,
 }

@@ -22,9 +22,7 @@ failure = "0.1.5"
 base64 = "0.10.1"
 rand = "0.6"
 approveapi = "1.0.3"
-
-#arangors = {path = "../../arangors"}
-#r2d2-arangodb = {path = "../../r2d2-arangodb"}
+reqwest = "0.9.18"
 
 [dependencies.arangors]
 git = "https://github.com/Ostoyae/arangors.git"

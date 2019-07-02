@@ -1,0 +1,16 @@
+[network]
+host = '0.0.0.0'
+port = '5000'
+
+[system]
+# this referes to the SyncArbiters, the Async thread for the DB connection pool.
+arbiters = 3
+# this refere to the web/api server workers (threads)
+workers = 1
+
+[limits]
+# arangodb aql batch_size
+batch_size = 25
+tag_limit = 4
+
+[loggin]
