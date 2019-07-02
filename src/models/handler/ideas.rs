@@ -37,44 +37,102 @@ fn filter_with(data: Vec<String>) -> String {
     q_string
 }
 
+fn query_simple(msg: QueryIdea) -> String {
+
+    let mut query = "FOR ele in ideas ".to_string();
+    if let Some(tags) = msg.tags {
+        query.push_str(filter_with(tags).as_str());
+    }
+
+    match &msg.sort {
+        Sort::ALL => query.push_str("SORT ele.date DESC "),
+        Sort::BRIGHT => {
+            query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
+        }
+    }
+
+    if let Some(page) = msg.pagination {
+        if page.count > 0 {
+            let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+            query.push_str(page_str.as_str());
+        }
+    }
+
+    query.push_str("RETURN ele");
+
+    query
+}
+
+fn query_with_search(msg: QueryIdea) -> String {
+
+    let mut query = format!("FOR ele in idea_search SEARCH ANALYZER(ele.text IN TOKENS('{query}' , 'text_en'), 'text_en') "
+                            , query=msg.query.unwrap().clone()
+    );
+
+    if let Some(tags) = msg.tags {
+        query.push_str(filter_with(tags).as_str());
+    }
+
+    match &msg.sort {
+        Sort::ALL => query.push_str("SORT ele.date DESC "),
+        Sort::BRIGHT => {
+            query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
+        }
+    }
+
+    query.push_str(" SORT TFIDF(ele) DESC ");
+
+    if let Some(page) = msg.pagination {
+        if page.count > 0 {
+            let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+            query.push_str(page_str.as_str());
+        }
+    }
+
+    query.push_str("RETURN ele");
+
+    query
+}
+
 impl Handler<QueryIdea> for DbExecutor {
     type Result = Result<Vec<Idea>, Error>;
 
     fn handle(&mut self, msg: QueryIdea, _ctx: &mut Self::Context) -> Self::Result {
         let conn = &self.0.get().unwrap();
 
-        let mut query = "FOR ele in ideas ".to_string();
+//        let mut query = "FOR ele in ideas ".to_string();
+//
+//
+//        if let Some(tags) = msg.tags {
+//            query.push_str(filter_with(tags).as_str());
+//        }
+//
+//        // Handles Sort
+//        match &msg.sort {
+//            Sort::ALL => query.push_str("SORT ele.date DESC "),
+//            Sort::BRIGHT => {
+//                query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
+//            }
+//        }
+//
+//        if let Some(page) = msg.pagination {
+//            if page.count > 0 {
+//                let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+//                query.push_str(page_str.as_str());
+//            }
+//        }
+//
+//        query.push_str("RETURN ele");
 
-        if let Some(tags) = msg.tags {
-            query.push_str(filter_with(tags).as_str());
-        }
+        let aql = if let Some(id) = msg.id {
+            "RETURN DOCUMENT(CONCAT('ideas/', @id ))".to_string()
+        } else if msg.query.is_some() {
+            query_with_search(msg)
+        } else {
+            query_simple(msg)
+        };
 
-        // Handles Sort
-        match &msg.sort {
-            Sort::ALL => query.push_str("SORT ele.date DESC "),
-            Sort::BRIGHT => {
-                query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
-            }
-        }
-
-        if let Some(page) = msg.pagination {
-            if page.count > 0 {
-                let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
-                query.push_str(page_str.as_str());
-            }
-        }
-
-        query.push_str("RETURN ele");
-
-        let mut aql = AqlQuery::new(&query).batch_size(50);
-
-        if let Some(id) = msg.id {
-            aql = AqlQuery::new("RETURN DOCUMENT(CONCAT('ideas/', @id ))")
-                .bind_var("id", id)
-                .batch_size(1);
-        }
-
-        let request: Vec<Idea> = match conn.aql_query(aql) {
+        let request: Vec<Idea> = match conn.aql_query(AqlQuery::new(&aql).batch_size(50)) {
             Ok(r) => r,
             Err(e) => {
                 println!("{}", e);

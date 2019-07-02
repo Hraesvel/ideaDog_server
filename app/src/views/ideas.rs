@@ -13,6 +13,7 @@ use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort, Paginati
 use serde::Deserialize;
 use serde_json::Value;
 use crate::util::idea::paginate;
+use actix_web::http::header::q;
 
 
 //use actix_web::ws::Message;
@@ -54,7 +55,8 @@ struct Param {
     id: Option<String>,
     tags: Option<String>,
     count: Option<u32>,
-    offset: Option<u32>
+    offset: Option<u32>,
+    q: Option<String>
 }
 
 #[derive(Deserialize)]
@@ -84,24 +86,27 @@ fn fail_query() -> FutureResponse<HttpResponse> {
 fn get_ideas_sort(
     (path, q_string, state): (Path<String>, Query<Param>, State<AppState>),
 ) -> FutureResponse<HttpResponse> {
-    let mut vec_of_tags = None;
-    if let Some(value) = &q_string.tags {
-        let v_string: Vec<String> = value.clone().split(',').map(|x| x.to_string()).collect();
-        vec_of_tags = Some(v_string);
-    };
-
 
     let mut q = QueryIdea {
         sort: Sort::ALL,
-        id: None,
-        owner: None,
-        owner_id: None,
-        tags: vec_of_tags,
-        pagination: None
+        pagination: paginate(q_string.offset, q_string.count),
+        ..QueryIdea::default()
     };
 
-    q.pagination = paginate(q_string.offset, q_string.count);
+    // sets query field if exists and not an empty string
+    if let Some(que) = &q_string.q {
+        if !que.is_empty(){
+            q.query = Some(que.clone())
+        }
+    }
 
+    // split up tag string into tokens
+    if let Some(t) = q_string.tags.clone() {
+        let tags: Vec<String> = t.split(",").map(|x| x.to_string()).collect();
+        q.tags = Some(tags);
+    }
+
+    // config sorting
     match path.into_inner().to_lowercase().as_str() {
         "bright" => q.sort = Sort::BRIGHT,
         _ => {}
@@ -111,22 +116,22 @@ fn get_ideas_sort(
 }
 
 fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureResponse<HttpResponse> {
-    let mut vec_of_tags = None;
-    if let Some(value) = &q_string.tags {
-        let v_string: Vec<String> = value.clone().split(',').map(|x| x.to_string()).collect();
-        vec_of_tags = Some(v_string);
-    };
+
     let mut q = QueryIdea {
         sort: Sort::ALL,
-        id: None,
-        owner: None,
-        owner_id: None,
-        tags: vec_of_tags,
-        pagination: None
+        pagination: paginate(q_string.offset, q_string.count),
+
+        ..QueryIdea::default()
     };
 
-    q.pagination = paginate(q_string.offset, q_string.count);
+    // sets query field if exists and not an empty string
+    if let Some(que) = &q_string.q {
+        if !que.is_empty(){
+            q.query = Some(que.clone())
+        }
+    }
 
+    // split up tag string into tokens
     if let Some(t) = q_string.tags.clone() {
         let tags: Vec<String> = t.split(",").map(|x| x.to_string()).collect();
         q.tags = Some(tags);
@@ -139,10 +144,7 @@ fn get_idea_id((path, state): (Path<String>, State<AppState>)) -> FutureResponse
     let q = QueryIdea {
         sort: Sort::ALL,
         id: Some(path.into_inner()),
-        owner: None,
-        owner_id: None,
-        tags: None,
-        pagination: None
+        ..QueryIdea::default()
     };
 
     run_query(q, state)

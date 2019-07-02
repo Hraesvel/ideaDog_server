@@ -88,7 +88,13 @@ pub enum Sort {
     ALL,
     BRIGHT,
 }
-#[derive(Debug)]
+
+impl Default for Sort {
+    fn default() -> Self {
+        Sort::ALL
+    }
+}
+#[derive(Debug, Default)]
 pub struct QueryIdea {
     pub sort: Sort,
     //id
@@ -100,7 +106,9 @@ pub struct QueryIdea {
     // accept tags for query string
     pub tags: Option<Vec<String>>,
 
-    pub pagination : Option<Pagination>
+    pub pagination : Option<Pagination>,
+    // query search
+    pub query: Option<String>
 }
 
 #[derive(Debug)]

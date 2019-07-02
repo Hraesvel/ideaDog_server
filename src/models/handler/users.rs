@@ -68,7 +68,8 @@ return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
                 )
                 .bind_var("ele", tok.clone())
                 .batch_size(1);
-            }
+            },
+
             QUser::ID(id) => {
                 aql = AqlQuery::new("RETURN DOCUMENT('users', @ele)")
                     .bind_var("ele", id.clone())
@@ -85,14 +86,6 @@ return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
 				Err(MailboxError::Closed)
 			}
 		};
-
-                res
-                },
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                Err(MailboxError::Closed)
-            }
-        };
 
         response
     }
