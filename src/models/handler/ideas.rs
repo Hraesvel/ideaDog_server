@@ -100,30 +100,6 @@ impl Handler<QueryIdea> for DbExecutor {
     fn handle(&mut self, msg: QueryIdea, _ctx: &mut Self::Context) -> Self::Result {
         let conn = &self.0.get().unwrap();
 
-//        let mut query = "FOR ele in ideas ".to_string();
-//
-//
-//        if let Some(tags) = msg.tags {
-//            query.push_str(filter_with(tags).as_str());
-//        }
-//
-//        // Handles Sort
-//        match &msg.sort {
-//            Sort::ALL => query.push_str("SORT ele.date DESC "),
-//            Sort::BRIGHT => {
-//                query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
-//            }
-//        }
-//
-//        if let Some(page) = msg.pagination {
-//            if page.count > 0 {
-//                let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
-//                query.push_str(page_str.as_str());
-//            }
-//        }
-//
-//        query.push_str("RETURN ele");
-
         let aql = if let Some(id) = msg.id {
             "RETURN DOCUMENT(CONCAT('ideas/', @id ))".to_string()
         } else if msg.query.is_some() {

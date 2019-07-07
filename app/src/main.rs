@@ -20,6 +20,7 @@ mod views;
 
 pub struct AppState {
     database: Addr<DbExecutor>,
+    request: reqwest::Client
 }
 
 fn greatings(_req: &HttpRequest<AppState>) -> impl Responder {
@@ -92,6 +93,7 @@ fn main() {
 
         App::with_state(AppState {
             database: addr.clone(),
+            request: reqwest::Client::new()
         })
         .prefix("/api")
         .default_resource(|r| r.h(NormalizePath::default()))

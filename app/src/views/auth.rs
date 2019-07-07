@@ -87,7 +87,6 @@ pub(crate) fn challenge_gen(size: usize) -> String {
     base64::encode_config(&nonce, base64::URL_SAFE)
 }
 
-// TODO: swap out bool for an RESULT type
 /// Check is a user (by email) exists in the Database registry
 pub(crate) fn exist_user(email: String, state: &State<AppState>) -> Result<(), MailboxError> {
     let response = state

@@ -10,10 +10,12 @@ use arangors::AqlQuery;
 use futures;
 use futures::future::{err, ok, Future};
 use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort, Pagination};
-use serde::Deserialize;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
 use crate::util::idea::paginate;
 use actix_web::http::header::q;
+use reqwest;
+use std::env;
+use reqwest::Url;
 
 
 //use actix_web::ws::Message;
@@ -224,44 +226,89 @@ fn update_idea_id(
         .responder()
 }
 
+#[derive(Deserialize, Debug, Clone)]
+struct VoteStatus {
+    idea_id : String,
+    prev: Option<String>,
+    new: Option<String>
+}
+
+impl VoteStatus {
+    fn has_changed(&self) -> bool {
+        if self.prev != self.new {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 impl Message for UserVote {
-    type Result = Result<Value, MailboxError>;
+    type Result = Result<VoteStatus, MailboxError>;
 }
 
 impl Handler<UserVote> for DbExecutor {
-    type Result = Result<Value, MailboxError>;
+    type Result = Result<VoteStatus, MailboxError>;
 
     fn handle(&mut self, msg: UserVote, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
-//		let req = reqwest::Client::new();
-//		let url = format!();
-//		req.post()
-
+//TODO: AQL query return the OLD and NEW update for this we'll create logic to update an idea's vote counter.
         let aql = AqlQuery::new(
             "LET user = FIRST (for u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @token) bearer_to_user RETURN u)
                 LET idea_id = DOCUMENT('ideas', @id)._id
                 UPSERT { _from: idea_id , _to: user._id }
                 INSERT { _from: idea_id , _to: user._id, vote: @vote }
-                UPDATE { vote: @vote } IN idea_voter LET vote = NEW
-                RETURN NEW"
+                UPDATE { vote: @vote } IN idea_voter LET prev = OLD LET new = NEW
+                RETURN {idea_id ,prev: OLD.vote, new: NEW.vote}"
         ).batch_size(1)
-            .bind_var("vote", msg.vote)
-            .bind_var("token", msg.u_token)
-            .bind_var("id", msg.idea_id);
+         .bind_var("vote", msg.vote)
+         .bind_var("token", msg.u_token)
+         .bind_var("id", msg.idea_id);
 
-        let response: Result<Value, MailboxError> = match conn.aql_query(aql) {
-            Ok(mut r) => Ok(r.pop().unwrap()),
+
+        let response: Result<VoteStatus, MailboxError> = match conn.aql_query(aql) {
+            Ok(mut r) => dbg!(Ok(r.pop().unwrap())),
             Err(_e) => {
                 //println!("Error: {}", e);
-                Err(MailboxError::Closed)
+                return Err(MailboxError::Closed);
             }
         };
 
-        response
+        let answer = response.unwrap();
+
+        let resp = if answer.has_changed() {
+            let mut sub = 1;
+             if let Some(a) = &answer.new {
+                match a.as_ref() {
+                    "upvote" => {
+                        if answer.prev.is_none() { sub = 0 };
+                        let _ : Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
+                            "UPDATE @@idea_id with {upvotes: upvotes + 1, downvotes : downvotes - @sub } into ideas RETURN NEW
+                            ")
+                            .batch_size(1)
+                            .bind_var("sub", sub)
+                            .bind_var("idea_id", answer.idea_id));
+                    }
+                    "downvote" => {
+                        if answer.prev.is_none() { sub = 0 };
+                        let _: Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
+                            "UPDATE @@idea_id with {upvotes: upvotes - @sub, downvotes : downvotes + 1 } into ideas RETURN NEW
+                            ")
+                            .batch_size(1)
+                            .bind_var("sub", sub)
+                            .bind_var("idea_id", answer.idea_id));
+                    },
+                    _ => unreachable!()
+                };
+                return Ok(VoteStatus { idea_id: "".to_string(), prev: None, new: None });
+            } else { Err(MailboxError::Closed) }
+
+        } else {Err(MailboxError::Closed)};
+
+        resp
     }
 }
-
 fn delete_idea_id(
     (path, req, state): (Path<String>, HttpRequest<AppState>, State<AppState>),
 ) -> FutureResponse<HttpResponse> {
@@ -297,6 +344,7 @@ impl Message for DeleteIdea {
 impl Handler<DeleteIdea> for DbExecutor {
     type Result = Result<(), MailboxError>;
 
+    // TODO: use aql query to validate and get idea ID but use ArangoDB http Graph API to delete ideas.
     fn handle(&mut self, msg: DeleteIdea, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
         let aql = AqlQuery::new(
@@ -306,20 +354,39 @@ impl Handler<DeleteIdea> for DbExecutor {
             FILTER i._key == @idea_key
             return i
             )
-            let owner = FIRST (FOR v, e in 1..1 OUTBOUND idea._id idea_owner RETURN e)
-            REMOVE owner IN idea_owner let e = OLD
-            REMOVE idea IN ideas LET removed = OLD
-            return removed
+            RETURN idea
 		",
         )
         .bind_var("token", msg.token.clone())
         .bind_var("idea_key", msg.idea_id)
         .batch_size(1);
 
-        let response: Option<Vec<Idea>> = match conn.aql_query(aql) {
-            Ok(r) => Some(r),
+        //TODO change return Option<IDEA>
+        let response: Option<Idea> = match conn.aql_query(aql) {
+            Ok(mut r) => {
+                if !r.is_empty() {
+                    Some( r.pop().unwrap())
+                } else {None}
+            },
             _ => None,
         };
+
+        if let Some(idea) = &response {
+            let url : Url = format!("http://{database_url}/_db/{db}/_api/gharial/{graph}/vertex/ideas/{idea_id}",
+                              database_url = format!("{}:{}",
+                                                     env::var("DB_HOST").expect("DB_HOST must be set."),
+                                                     env::var("DB_PORT").expect("DB_PORT must be set."),
+                              ),
+                              db = "test_db",
+                              graph = "rel",
+                              idea_id = idea.key).parse().unwrap();
+            let client = reqwest::Client::new();
+            client.delete(url)
+            .basic_auth(
+                env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
+                Some(env::var("DB_PASSWORD").expect("DB_PASSWORD must be set.")),
+            ).send();
+        }
 
         if let Some(_r) = response {
             return Ok(());
