@@ -283,21 +283,25 @@ impl Handler<UserVote> for DbExecutor {
                 match a.as_ref() {
                     "upvote" => {
                         if answer.prev.is_none() { sub = 0 };
-                        let _ : Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
-                            "UPDATE @@idea_id with {upvotes: upvotes + 1, downvotes : downvotes - @sub } into ideas RETURN NEW
+                        let v : Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
+                            "LET doc = DOCUMENT(@idea_id)
+                            UPDATE doc with {upvotes: doc.upvotes + 1, downvotes : doc.downvotes - @sub } in ideas RETURN NEW
                             ")
                             .batch_size(1)
                             .bind_var("sub", sub)
                             .bind_var("idea_id", answer.idea_id));
+                        dbg!(v);
                     }
                     "downvote" => {
                         if answer.prev.is_none() { sub = 0 };
-                        let _: Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
-                            "UPDATE @@idea_id with {upvotes: upvotes - @sub, downvotes : downvotes + 1 } into ideas RETURN NEW
+                        let v: Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
+                            "LET doc = DOCUMENT(@idea_id)
+                            UPDATE doc with {upvotes: doc.upvotes - @sub, downvotes : doc.downvotes + 1 } in ideas RETURN NEW
                             ")
                             .batch_size(1)
                             .bind_var("sub", sub)
                             .bind_var("idea_id", answer.idea_id));
+                        dbg!(v);
                     },
                     _ => unreachable!()
                 };
@@ -381,11 +385,13 @@ impl Handler<DeleteIdea> for DbExecutor {
                               graph = "rel",
                               idea_id = idea.key).parse().unwrap();
             let client = reqwest::Client::new();
-            client.delete(url)
+            let req = client.delete(url)
             .basic_auth(
                 env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
                 Some(env::var("DB_PASSWORD").expect("DB_PASSWORD must be set.")),
             ).send();
+
+            dbg!(req);
         }
 
         if let Some(_r) = response {

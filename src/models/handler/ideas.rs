@@ -101,7 +101,7 @@ impl Handler<QueryIdea> for DbExecutor {
         let conn = &self.0.get().unwrap();
 
         let aql = if let Some(id) = msg.id {
-            "RETURN DOCUMENT(CONCAT('ideas/', @id ))".to_string()
+            format!("RETURN DOCUMENT(CONCAT('ideas/', {id} ))",id=id)
         } else if msg.query.is_some() {
             query_with_search(msg)
         } else {
