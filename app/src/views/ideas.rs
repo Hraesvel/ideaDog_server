@@ -9,7 +9,7 @@ use actix_web::{AsyncResponder, Path};
 use arangors::AqlQuery;
 use futures;
 use futures::future::{err, ok, Future};
-use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort, Pagination};
+use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort, Pagination, CastVote};
 use serde::{Deserialize, Serialize};
 use crate::util::idea::paginate;
 use actix_web::http::header::q;
@@ -47,7 +47,7 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
             })
             .resource("/{id}/{vote}", |r| {
                 r.middleware(AuthMiddleware);
-                r.method(Method::POST).with(update_idea_id);
+                r.method(Method::POST).with(vote_idea_id);
             })
     })
 }
@@ -85,9 +85,7 @@ fn fail_query() -> FutureResponse<HttpResponse> {
         .responder()
 }
 
-fn get_ideas_sort(
-    (path, q_string, state): (Path<String>, Query<Param>, State<AppState>),
-) -> FutureResponse<HttpResponse> {
+fn get_ideas_sort((path, q_string, state): (Path<String>, Query<Param>, State<AppState>), ) -> FutureResponse<HttpResponse> {
 
     let mut q = QueryIdea {
         sort: Sort::ALL,
@@ -177,32 +175,28 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
         .responder()
 }
 
-#[derive(Clone)]
-struct UserVote {
-    idea_id: String,
-    u_token: String,
-    vote: String,
-}
-
-fn update_idea_id(
+fn vote_idea_id(
     (req, path, state): (
         HttpRequest<AppState>,
         Path<(String, String)>,
         State<AppState>,
     ),
 ) -> FutureResponse<HttpResponse> {
-    let current_user = dbg!(extract_token(&req));
+    let current_user = extract_token(&req);
     let (id, vote) = path.into_inner();
 
     ok::<HttpResponse, actix_web::Error>(HttpResponse::Ok().finish())
         .and_then(|_| match vote.as_ref() {
             "upvote" => Ok(vote),
             "downvote" => Ok(vote),
-            _ => Err(ServiceError::NotFound.into()),
+            _ => {
+                println!("Error: action not found");
+                Err(ServiceError::NotFound.into())
+            },
         })
         .and_then(move |vote| {
             let user_vote = if let Some(token) = current_user {
-                Ok(UserVote {
+                Ok(CastVote {
                     idea_id: id,
                     u_token: token,
                     vote,
@@ -220,99 +214,17 @@ fn update_idea_id(
                 .from_err()
                 .and_then(|res| match res {
                     Ok(_) => Ok(HttpResponse::Ok().finish()),
-                    Err(_) => Err(ServiceError::NotFound.into()),
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        Err(ServiceError::NotFound.into())},
                 })
         })
         .responder()
 }
 
-#[derive(Deserialize, Debug, Clone)]
-struct VoteStatus {
-    idea_id : String,
-    prev: Option<String>,
-    new: Option<String>
-}
-
-impl VoteStatus {
-    fn has_changed(&self) -> bool {
-        if self.prev != self.new {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Message for UserVote {
-    type Result = Result<VoteStatus, MailboxError>;
-}
-
-impl Handler<UserVote> for DbExecutor {
-    type Result = Result<VoteStatus, MailboxError>;
-
-    fn handle(&mut self, msg: UserVote, _ctx: &mut Self::Context) -> Self::Result {
-        let conn = self.0.get().unwrap();
-
-//TODO: AQL query return the OLD and NEW update for this we'll create logic to update an idea's vote counter.
-        let aql = AqlQuery::new(
-            "LET user = FIRST (for u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @token) bearer_to_user RETURN u)
-                LET idea_id = DOCUMENT('ideas', @id)._id
-                UPSERT { _from: idea_id , _to: user._id }
-                INSERT { _from: idea_id , _to: user._id, vote: @vote }
-                UPDATE { vote: @vote } IN idea_voter LET prev = OLD LET new = NEW
-                RETURN {idea_id ,prev: OLD.vote, new: NEW.vote}"
-        ).batch_size(1)
-         .bind_var("vote", msg.vote)
-         .bind_var("token", msg.u_token)
-         .bind_var("id", msg.idea_id);
 
 
-        let response: Result<VoteStatus, MailboxError> = match conn.aql_query(aql) {
-            Ok(mut r) => dbg!(Ok(r.pop().unwrap())),
-            Err(_e) => {
-                //println!("Error: {}", e);
-                return Err(MailboxError::Closed);
-            }
-        };
 
-        let answer = response.unwrap();
-
-        let resp = if answer.has_changed() {
-            let mut sub = 1;
-             if let Some(a) = &answer.new {
-                match a.as_ref() {
-                    "upvote" => {
-                        if answer.prev.is_none() { sub = 0 };
-                        let v : Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
-                            "LET doc = DOCUMENT(@idea_id)
-                            UPDATE doc with {upvotes: doc.upvotes + 1, downvotes : doc.downvotes - @sub } in ideas RETURN NEW
-                            ")
-                            .batch_size(1)
-                            .bind_var("sub", sub)
-                            .bind_var("idea_id", answer.idea_id));
-                        dbg!(v);
-                    }
-                    "downvote" => {
-                        if answer.prev.is_none() { sub = 0 };
-                        let v: Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
-                            "LET doc = DOCUMENT(@idea_id)
-                            UPDATE doc with {upvotes: doc.upvotes - @sub, downvotes : doc.downvotes + 1 } in ideas RETURN NEW
-                            ")
-                            .batch_size(1)
-                            .bind_var("sub", sub)
-                            .bind_var("idea_id", answer.idea_id));
-                        dbg!(v);
-                    },
-                    _ => unreachable!()
-                };
-                return Ok(VoteStatus { idea_id: "".to_string(), prev: None, new: None });
-            } else { Err(MailboxError::Closed) }
-
-        } else {Err(MailboxError::Closed)};
-
-        resp
-    }
-}
 fn delete_idea_id(
     (path, req, state): (Path<String>, HttpRequest<AppState>, State<AppState>),
 ) -> FutureResponse<HttpResponse> {
@@ -385,13 +297,13 @@ impl Handler<DeleteIdea> for DbExecutor {
                               graph = "rel",
                               idea_id = idea.key).parse().unwrap();
             let client = reqwest::Client::new();
-            let req = client.delete(url)
+            let _req = client.delete(url)
             .basic_auth(
                 env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
                 Some(env::var("DB_PASSWORD").expect("DB_PASSWORD must be set.")),
             ).send();
 
-            dbg!(req);
+//            dbg!(req);
         }
 
         if let Some(_r) = response {

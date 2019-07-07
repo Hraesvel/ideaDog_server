@@ -113,3 +113,27 @@ pub struct Pagination {
     pub count: u32,
     pub offset: u32,
 }
+
+#[derive(Clone)]
+pub struct CastVote {
+    pub idea_id: String,
+    pub u_token: String,
+    pub vote: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct VoteStatus {
+    pub idea_id : String,
+    pub prev: Option<String>,
+    pub new: Option<String>
+}
+
+impl VoteStatus {
+    pub fn has_changed(&self) -> bool {
+        if self.prev != self.new {
+            true
+        } else {
+            false
+        }
+    }
+}

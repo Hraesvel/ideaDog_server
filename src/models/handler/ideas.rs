@@ -1,4 +1,4 @@
-use actix::Handler;
+use actix::{Handler, MailboxError};
 use arangors;
 use arangors::AqlQuery;
 use chrono::Utc;
@@ -8,8 +8,8 @@ use reqwest;
 
 use serde::{Deserialize, Serialize};
 
-use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
-use crate::DbExecutor;
+use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort, CastVote};
+use crate::{DbExecutor, VoteStatus};
 use serde::export::PhantomData;
 use std::collections::HashMap;
 
@@ -181,5 +181,70 @@ impl Handler<NewIdea> for DbExecutor {
             .unwrap();
 
         Ok(response)
+    }
+}
+
+impl Handler<CastVote> for DbExecutor {
+    type Result = Result<VoteStatus, MailboxError>;
+
+    fn handle(&mut self, msg: CastVote, _ctx: &mut Self::Context) -> Self::Result {
+        let conn = self.0.get().unwrap();
+
+        let aql = AqlQuery::new(
+            "LET user = FIRST (for u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @token) bearer_to_user RETURN u)
+                LET idea_id = DOCUMENT('ideas', @id)._id
+                UPSERT { _from: idea_id , _to: user._id }
+                INSERT { _from: idea_id , _to: user._id, vote: @vote }
+                UPDATE { vote: @vote } IN idea_voter LET prev = OLD LET new = NEW
+                RETURN {idea_id ,prev: OLD.vote, new: NEW.vote}"
+        ).batch_size(1)
+         .bind_var("vote", msg.vote)
+         .bind_var("token", msg.u_token)
+         .bind_var("id", msg.idea_id);
+
+        let response: Result<VoteStatus, MailboxError> = match conn.aql_query(aql) {
+            Ok(mut r) => Ok(r.pop().unwrap()),
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                return Err(MailboxError::Closed);
+            }
+        };
+
+        let answer = response.unwrap();
+
+        let resp = if answer.has_changed() {
+            let mut sub = 1;
+            if let Some(a) = &answer.new {
+                match a.as_ref() {
+                    "upvote" => {
+                        if answer.prev.is_none() { sub = 0 };
+                        let _v : Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
+                            "LET doc = DOCUMENT(@idea_id)
+                            UPDATE doc with {upvotes: doc.upvotes + 1, downvotes : doc.downvotes - @sub } in ideas RETURN NEW
+                            ")
+                            .batch_size(1)
+                            .bind_var("sub", sub)
+                            .bind_var("idea_id", answer.idea_id));
+//                        dbg!(v);
+                    }
+                    "downvote" => {
+                        if answer.prev.is_none() { sub = 0 };
+                        let _v: Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
+                            "LET doc = DOCUMENT(@idea_id)
+                            UPDATE doc with {upvotes: doc.upvotes - @sub, downvotes : doc.downvotes + 1 } in ideas RETURN NEW
+                            ")
+                            .batch_size(1)
+                            .bind_var("sub", sub)
+                            .bind_var("idea_id", answer.idea_id));
+//                        dbg!(v);
+                    },
+                    _ => unreachable!()
+                };
+                return Ok(VoteStatus { idea_id: "".to_string(), prev: None, new: None });
+            } else { Err(MailboxError::Closed) }
+
+        } else {Err(MailboxError::Closed)};
+
+        resp
     }
 }
