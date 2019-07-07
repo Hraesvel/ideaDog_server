@@ -67,9 +67,6 @@ pub struct Idea {
     pub tags: Vec<String>,
 
     pub date: i64,
-
-    #[serde(default)]
-    pub voters: Option<HashMap<String, bool>>,
 }
 
 #[derive(Debug, Clone)]
