@@ -23,13 +23,6 @@ pub struct User {
     pub created_at: i64,
 }
 
-#[derive(Debug)]
-pub struct QueryUser {
-    // find the token and then get the user it points to.
-    pub token: Option<String>,
-    pub id: Option<String>,
-}
-
 #[derive(Deserialize, Debug)]
 pub struct QUserParams {
     include_ideas: Option<bool>,

@@ -6,47 +6,8 @@ use r2d2::Error;
 
 use serde_json;
 
-use crate::{DbExecutor, NewUser, QUser, QueryUser, ServiceError, User};
+use crate::{DbExecutor, NewUser, QUser, ServiceError, User};
 use std::collections::HashMap;
-
-impl Handler<QueryUser> for DbExecutor {
-    type Result = Result<User, MailboxError>;
-
-    fn handle(&mut self, msg: QueryUser, _ctx: &mut Self::Context) -> Self::Result {
-        let conn = self.0.get().unwrap();
-
-        let mut aql = AqlQuery::new("");
-
-        if let Some(t) = msg.token {
-            aql = AqlQuery::new(
-"
-let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
-let ideas = (FOR i in 1..1 INBOUND u._id idea_owner return {[i._key]: 'true'})
-let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
-return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
-"
-			)
-				.bind_var("ele", t.clone())
-				.batch_size(1);
-		}
-
-        let response: Result<User, MailboxError> = match conn.aql_query(aql) {
-            Ok(mut r) => {
-                if !r.is_empty() {
-                    Ok(r.pop().unwrap())
-                } else {
-                    Err(MailboxError::Closed)
-                }
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-                Err(MailboxError::Closed)
-            }
-        };
-
-        response
-    }
-}
 
 impl Handler<QUser> for DbExecutor {
     type Result = Result<User, MailboxError>;
