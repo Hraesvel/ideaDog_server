@@ -61,9 +61,15 @@ impl Handler<QUser> for DbExecutor {
                 aql = AqlQuery::new(
 "
 let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
-let ideas = (FOR i in 1..1 INBOUND u._id idea_owner return {[i._key]: 'true'})
+let ideas = (FOR i in 1..1 INBOUND u._id idea_owner
+return {[i._key]: 'true'}
+)
+let c = FIRST (FOR i in 1..1 INBOUND u._id idea_owner
+Collect AGGREGATE upvotes = SUM(i.upvotes), downvotes = SUM(i.downvotes)
+return {upvotes, downvotes}
+)
 let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
-return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
+return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes), upvotes: c.upvotes, downvotes: c.downvotes})
 ",
                 )
                 .bind_var("ele", tok.clone())
