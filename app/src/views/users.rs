@@ -74,16 +74,19 @@ impl Handler<UIdeas> for DbExecutor {
         let conn = self.0.get().unwrap();
 
         let aql = AqlQuery::new(
-            "FOR i in 1..1 INBOUND CONCAT('users/', @id ) idea_owner
-		SORT i.date DESC
-        RETURN i",
+"FOR i, v in 1..1 INBOUND CONCAT('users/', @id ) idea_owner
+FILTER IS_DOCUMENT(DOCUMENT(v._from))
+SORT i.date DESC
+RETURN i",
         )
         .bind_var("id", msg.0)
         .batch_size(25);
 
         let response: Vec<Idea> = match conn.aql_query(aql) {
-            Ok(r) => r,
-            Err(_) => vec![],
+            Ok(r) => dbg!(r),
+            Err(e) => {
+                println!("Error: {}", e);
+                vec![]},
         };
 
         Ok(response)
