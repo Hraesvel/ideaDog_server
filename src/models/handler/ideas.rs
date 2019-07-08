@@ -1,28 +1,27 @@
 use actix::{Handler, MailboxError};
 use arangors;
 use arangors::AqlQuery;
-use chrono::Utc;
+
 use r2d2::Error;
-use reqwest;
 
 
 use serde::{Deserialize, Serialize};
 
-use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort, CastVote};
+use crate::models::{CastVote, Idea, NewIdea, Owner, QueryIdea, Sort};
 use crate::{DbExecutor, VoteStatus};
-use serde::export::PhantomData;
+
 use std::collections::HashMap;
 
+//noinspection RsExternalLinter
 // TODO: Design a idiomatic way to generate AQL queries,
-
 // Prototype for generating AQL queries as a stack
-struct ArangoQuery<SORT> {
-    collection: String,
-    filters: Option<Vec<String>>,
-    limit: Option<String>,
-    sort: Option<SORT>,
-    sub_query: Option<Box<ArangoQuery<SORT>>>,
-}
+//struct ArangoQuery<SORT> {
+//    collection: String,
+//    filters: Option<Vec<String>>,
+//    limit: Option<String>,
+//    sort: Option<SORT>,
+//    sub_query: Option<Box<ArangoQuery<SORT>>>,
+//}
 
 /// Generates a AQL FILTER line to be appended
 fn filter_with(data: Vec<String>) -> String {
@@ -38,7 +37,6 @@ fn filter_with(data: Vec<String>) -> String {
 }
 
 fn query_simple(msg: QueryIdea) -> String {
-
     let mut query = "FOR ele in ideas ".to_string();
     if let Some(tags) = msg.tags {
         query.push_str(filter_with(tags).as_str());
@@ -46,14 +44,16 @@ fn query_simple(msg: QueryIdea) -> String {
 
     match &msg.sort {
         Sort::ALL => query.push_str("SORT ele.date DESC "),
-        Sort::BRIGHT => {
-            query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
-        }
+        Sort::BRIGHT => query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC "),
     }
 
     if let Some(page) = msg.pagination {
         if page.count > 0 {
-            let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+            let page_str = format!(
+                " LIMIT {offset} , {count} ",
+                offset = page.offset,
+                count = page.count
+            );
             query.push_str(page_str.as_str());
         }
     }
@@ -64,7 +64,6 @@ fn query_simple(msg: QueryIdea) -> String {
 }
 
 fn query_with_search(msg: QueryIdea) -> String {
-
     let mut query = format!("FOR ele in idea_search SEARCH ANALYZER(ele.text IN TOKENS('{query}' , 'text_en'), 'text_en') "
                             , query=msg.query.unwrap().clone()
     );
@@ -75,16 +74,18 @@ fn query_with_search(msg: QueryIdea) -> String {
 
     match &msg.sort {
         Sort::ALL => query.push_str("SORT ele.date DESC "),
-        Sort::BRIGHT => {
-            query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
-        }
+        Sort::BRIGHT => query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC "),
     }
 
     query.push_str(" SORT TFIDF(ele) DESC ");
 
     if let Some(page) = msg.pagination {
         if page.count > 0 {
-            let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+            let page_str = format!(
+                " LIMIT {offset} , {count} ",
+                offset = page.offset,
+                count = page.count
+            );
             query.push_str(page_str.as_str());
         }
     }
@@ -101,7 +102,7 @@ impl Handler<QueryIdea> for DbExecutor {
         let conn = &self.0.get().unwrap();
 
         let aql = if let Some(id) = msg.id {
-            format!("RETURN DOCUMENT(CONCAT('ideas/', {id} ))",id=id)
+            format!("RETURN DOCUMENT(CONCAT('ideas/', {id} ))", id = id)
         } else if msg.query.is_some() {
             query_with_search(msg)
         } else {
@@ -217,7 +218,9 @@ impl Handler<CastVote> for DbExecutor {
             if let Some(a) = &answer.new {
                 match a.as_ref() {
                     "upvote" => {
-                        if answer.prev.is_none() { sub = 0 };
+                        if answer.prev.is_none() {
+                            sub = 0
+                        };
                         let _v : Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
                             "LET doc = DOCUMENT(@idea_id)
                             UPDATE doc with {upvotes: doc.upvotes + 1, downvotes : doc.downvotes - @sub } in ideas RETURN NEW
@@ -225,10 +228,12 @@ impl Handler<CastVote> for DbExecutor {
                             .batch_size(1)
                             .bind_var("sub", sub)
                             .bind_var("idea_id", answer.idea_id));
-//                        dbg!(v);
+                        //                        dbg!(v);
                     }
                     "downvote" => {
-                        if answer.prev.is_none() { sub = 0 };
+                        if answer.prev.is_none() {
+                            sub = 0
+                        };
                         let _v: Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
                             "LET doc = DOCUMENT(@idea_id)
                             UPDATE doc with {upvotes: doc.upvotes - @sub, downvotes : doc.downvotes + 1 } in ideas RETURN NEW
@@ -236,14 +241,21 @@ impl Handler<CastVote> for DbExecutor {
                             .batch_size(1)
                             .bind_var("sub", sub)
                             .bind_var("idea_id", answer.idea_id));
-//                        dbg!(v);
-                    },
-                    _ => unreachable!()
+                        //                        dbg!(v);
+                    }
+                    _ => unreachable!(),
                 };
-                return Ok(VoteStatus { idea_id: "".to_string(), prev: None, new: None });
-            } else { Err(MailboxError::Closed) }
-
-        } else {Err(MailboxError::Closed)};
+                return Ok(VoteStatus {
+                    idea_id: "".to_string(),
+                    prev: None,
+                    new: None,
+                });
+            } else {
+                Err(MailboxError::Closed)
+            }
+        } else {
+            Err(MailboxError::Closed)
+        };
 
         resp
     }

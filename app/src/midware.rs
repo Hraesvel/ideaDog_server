@@ -5,8 +5,7 @@ use actix_web::HttpRequest;
 use actix_web::{HttpResponse, ResponseError, Result};
 use arangors::AqlQuery;
 use futures::future::Future;
-use ideadog::{DbExecutor};
-
+use ideadog::DbExecutor;
 
 pub struct AuthMiddleware;
 

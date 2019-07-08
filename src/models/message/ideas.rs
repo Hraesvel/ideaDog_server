@@ -1,7 +1,7 @@
-use crate::models::{Idea, NewIdea, QueryIdea, CastVote, VoteStatus};
+use crate::models::{CastVote, Idea, NewIdea, QueryIdea, VoteStatus};
+use actix::MailboxError;
 use actix_web::actix::Message;
 use r2d2::Error;
-use actix::MailboxError;
 
 impl Message for Idea {
     type Result = Result<Idea, Error>;

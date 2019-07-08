@@ -1,11 +1,11 @@
-use crate::views::users::{create_user};
+use crate::views::users::create_user;
 use crate::{midware::ServiceError, AppState, DbExecutor};
 use actix::MailboxError;
 use actix_web::actix;
 use actix_web::actix::{Handler, Message};
 use actix_web::http::{Cookie, Method, StatusCode};
 use actix_web::{
-    App, AsyncResponder, Form, FutureResponse, HttpRequest, HttpResponse, Json, Responder, Result,
+    App, AsyncResponder, FutureResponse, HttpResponse, Json, Result,
     State,
 };
 
@@ -15,12 +15,10 @@ use chrono::Utc;
 use futures::future::Future;
 use ideadog::{Challenge, Login};
 use rand;
-use rand::OsRng;
+use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json;
-
-
 
 #[derive(Deserialize, Debug, Serialize)]
 pub struct Token {
@@ -103,8 +101,7 @@ pub(crate) fn exist_user(email: String, state: &State<AppState>) -> Result<(), M
 
 #[derive(Deserialize, Debug)]
 struct Pending {
-	token: String,
-
+    token: String,
 }
 
 /// This function will take a `Challenge` token from the user and compare to the one stored in the Database.

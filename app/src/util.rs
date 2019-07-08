@@ -31,9 +31,12 @@ pub mod idea {
         let page = if offset.is_some() && count.is_some() {
             Pagination {
                 count: count.unwrap(),
-                offset : offset.unwrap(),
-            }.into()
-        } else { None };
+                offset: offset.unwrap(),
+            }
+            .into()
+        } else {
+            None
+        };
         page
     }
 }

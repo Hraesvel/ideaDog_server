@@ -1,5 +1,5 @@
 pub use self::challenge::*;
-pub use self::ideas::{Idea, NewIdea, Owner, QueryIdea, Sort, Pagination, CastVote, VoteStatus};
+pub use self::ideas::{CastVote, Idea, NewIdea, Owner, Pagination, QueryIdea, Sort, VoteStatus};
 pub use self::tags::{QueryTag, Tag};
 pub use self::users::{NewUser, QUser, QUserParams, User};
 

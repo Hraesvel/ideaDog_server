@@ -3,7 +3,7 @@ use r2d2::PooledConnection;
 use r2d2_arangodb::ArangodbConnectionManager;
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::{BTreeMap, HashMap};
+
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
@@ -103,9 +103,9 @@ pub struct QueryIdea {
     // accept tags for query string
     pub tags: Option<Vec<String>>,
 
-    pub pagination : Option<Pagination>,
+    pub pagination: Option<Pagination>,
     // query search
-    pub query: Option<String>
+    pub query: Option<String>,
 }
 
 #[derive(Debug)]
@@ -123,9 +123,9 @@ pub struct CastVote {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct VoteStatus {
-    pub idea_id : String,
+    pub idea_id: String,
     pub prev: Option<String>,
-    pub new: Option<String>
+    pub new: Option<String>,
 }
 
 impl VoteStatus {

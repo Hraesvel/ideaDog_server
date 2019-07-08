@@ -1,22 +1,21 @@
 use crate::AppState;
 
+use crate::util::idea::paginate;
 use crate::util::user::extract_token;
 use crate::AuthMiddleware;
 use actix_web::actix::{Handler, MailboxError, Message};
+
 use actix_web::http::{Method, NormalizePath, StatusCode};
 use actix_web::{App, FutureResponse, HttpRequest, HttpResponse, Json, Query, State};
 use actix_web::{AsyncResponder, Path};
 use arangors::AqlQuery;
 use futures;
 use futures::future::{err, ok, Future};
-use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort, Pagination, CastVote};
-use serde::{Deserialize, Serialize};
-use crate::util::idea::paginate;
-use actix_web::http::header::q;
+use ideadog::{CastVote, DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort};
 use reqwest;
-use std::env;
 use reqwest::Url;
-
+use serde::{Deserialize};
+use std::env;
 
 //use actix_web::ws::Message;
 
@@ -58,7 +57,7 @@ struct Param {
     tags: Option<String>,
     count: Option<u32>,
     offset: Option<u32>,
-    q: Option<String>
+    q: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -85,8 +84,9 @@ fn fail_query() -> FutureResponse<HttpResponse> {
         .responder()
 }
 
-fn get_ideas_sort((path, q_string, state): (Path<String>, Query<Param>, State<AppState>), ) -> FutureResponse<HttpResponse> {
-
+fn get_ideas_sort(
+    (path, q_string, state): (Path<String>, Query<Param>, State<AppState>),
+) -> FutureResponse<HttpResponse> {
     let mut q = QueryIdea {
         sort: Sort::ALL,
         pagination: paginate(q_string.offset, q_string.count),
@@ -95,7 +95,7 @@ fn get_ideas_sort((path, q_string, state): (Path<String>, Query<Param>, State<Ap
 
     // sets query field if exists and not an empty string
     if let Some(que) = &q_string.q {
-        if !que.is_empty(){
+        if !que.is_empty() {
             q.query = Some(que.clone())
         }
     }
@@ -116,7 +116,6 @@ fn get_ideas_sort((path, q_string, state): (Path<String>, Query<Param>, State<Ap
 }
 
 fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureResponse<HttpResponse> {
-
     let mut q = QueryIdea {
         sort: Sort::ALL,
         pagination: paginate(q_string.offset, q_string.count),
@@ -126,7 +125,7 @@ fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureRespon
 
     // sets query field if exists and not an empty string
     if let Some(que) = &q_string.q {
-        if !que.is_empty(){
+        if !que.is_empty() {
             q.query = Some(que.clone())
         }
     }
@@ -192,7 +191,7 @@ fn vote_idea_id(
             _ => {
                 println!("Error: action not found");
                 Err(ServiceError::NotFound.into())
-            },
+            }
         })
         .and_then(move |vote| {
             let user_vote = if let Some(token) = current_user {
@@ -216,14 +215,12 @@ fn vote_idea_id(
                     Ok(_) => Ok(HttpResponse::Ok().finish()),
                     Err(e) => {
                         println!("Error: {}", e);
-                        Err(ServiceError::NotFound.into())},
+                        Err(ServiceError::NotFound.into())
+                    }
                 })
         })
         .responder()
 }
-
-
-
 
 fn delete_idea_id(
     (path, req, state): (Path<String>, HttpRequest<AppState>, State<AppState>),
@@ -281,29 +278,38 @@ impl Handler<DeleteIdea> for DbExecutor {
         let response: Option<Idea> = match conn.aql_query(aql) {
             Ok(mut r) => {
                 if !r.is_empty() {
-                    Some( r.pop().unwrap())
-                } else {None}
-            },
+                    Some(r.pop().unwrap())
+                } else {
+                    None
+                }
+            }
             _ => None,
         };
 
         if let Some(idea) = &response {
-            let url : Url = format!("http://{database_url}/_db/{db}/_api/gharial/{graph}/vertex/ideas/{idea_id}",
-                              database_url = format!("{}:{}",
-                                                     env::var("DB_HOST").expect("DB_HOST must be set."),
-                                                     env::var("DB_PORT").expect("DB_PORT must be set."),
-                              ),
-                              db = "test_db",
-                              graph = "rel",
-                              idea_id = idea.key).parse().unwrap();
+            let url: Url = format!(
+                "http://{database_url}/_db/{db}/_api/gharial/{graph}/vertex/ideas/{idea_id}",
+                database_url = format!(
+                    "{}:{}",
+                    env::var("DB_HOST").expect("DB_HOST must be set."),
+                    env::var("DB_PORT").expect("DB_PORT must be set."),
+                ),
+                db = "test_db",
+                graph = "rel",
+                idea_id = idea.key
+            )
+            .parse()
+            .unwrap();
             let client = reqwest::Client::new();
-            let _req = client.delete(url)
-            .basic_auth(
-                env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
-                Some(env::var("DB_PASSWORD").expect("DB_PASSWORD must be set.")),
-            ).send();
+            let _req = client
+                .delete(url)
+                .basic_auth(
+                    env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
+                    Some(env::var("DB_PASSWORD").expect("DB_PASSWORD must be set.")),
+                )
+                .send();
 
-//            dbg!(req);
+            //            dbg!(req);
         }
 
         if let Some(_r) = response {

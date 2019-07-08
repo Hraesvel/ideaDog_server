@@ -6,16 +6,17 @@ use r2d2::Error;
 
 use serde_json;
 
-use crate::{DbExecutor, NewUser, QUser, ServiceError, User};
-use std::collections::HashMap;
+use crate::{DbExecutor, NewUser, QUser, User};
+
 
 impl Handler<QUser> for DbExecutor {
     type Result = Result<User, MailboxError>;
 
-    fn handle(&mut self, msg: QUser, _ctx: &mut Self::Context) -> Self::Result {
+    //noinspection RsExternalLinter
+	fn handle(&mut self, msg: QUser, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
-        let mut aql = AqlQuery::new("");
+        let mut aql ;
 
         match msg {
             QUser::TOKEN(tok) => {
@@ -35,7 +36,7 @@ return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes), upvotes: c.upvotes, d
                 )
                 .bind_var("ele", tok.clone())
                 .batch_size(1);
-            },
+            }
 
             QUser::ID(id) => {
                 aql = AqlQuery::new("RETURN DOCUMENT('users', @ele)")
@@ -44,15 +45,19 @@ return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes), upvotes: c.upvotes, d
             }
         }
 
-		let response: Result<User, MailboxError>  = match conn.aql_query(aql) {
-			Ok(mut r) => {
-				if !r.is_empty() { Ok(r.pop().unwrap()) } else { Err(MailboxError::Closed)}
-			},
-			Err(e) => {
-				eprintln!("Error: {}", e);
-				Err(MailboxError::Closed)
-			}
-		};
+        let response: Result<User, MailboxError> = match conn.aql_query(aql) {
+            Ok(mut r) => {
+                if !r.is_empty() {
+                    Ok(r.pop().unwrap())
+                } else {
+                    Err(MailboxError::Closed)
+                }
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                Err(MailboxError::Closed)
+            }
+        };
 
         response
     }
