@@ -294,8 +294,8 @@ impl Handler<DeleteIdea> for DbExecutor {
                     env::var("DB_HOST").expect("DB_HOST must be set."),
                     env::var("DB_PORT").expect("DB_PORT must be set."),
                 ),
-                db = "test_db",
-                graph = "rel",
+                db = env::var("DB_NAME").expect("DB_NAME must be set"),
+                graph = env::var("DB_GRAPH_NAME").expect("DB_GRAPH_NAME must be set"),
                 idea_id = idea.key
             )
             .parse()

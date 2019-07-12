@@ -38,7 +38,7 @@ pub struct NewUser {
     pub username: String,
     pub email: String,
     #[serde(default)]
-    pub ideas: Vec<String>,
+    pub ideas: HashMap<String, String>,
     #[serde(default)]
     pub active: bool,
     #[serde(default)]

@@ -31,7 +31,7 @@ Collect AGGREGATE upvotes = SUM(i.upvotes), downvotes = SUM(i.downvotes)
 return {upvotes, downvotes}
 )
 let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
-return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes), upvotes: c.upvotes, downvotes: c.downvotes})
+return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes), upvotes: TO_NUMBER(c.upvotes), downvotes: TO_NUMBER(c.downvotes)})
 ",
                 )
                 .bind_var("ele", tok.clone())
@@ -39,7 +39,18 @@ return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes), upvotes: c.upvotes, d
             }
 
             QUser::ID(id) => {
-                aql = AqlQuery::new("RETURN DOCUMENT('users', @ele)")
+                aql = AqlQuery::new(
+"let u = DOCUMENT('users', @ele)
+let ideas = (FOR i in 1..1 INBOUND u._id idea_owner
+return {[i._key]: 'true'}
+)
+let c = FIRST (FOR i in 1..1 INBOUND u._id idea_owner
+Collect AGGREGATE upvotes = SUM(i.upvotes), downvotes = SUM(i.downvotes)
+return {upvotes, downvotes}
+)
+
+return Merge(u, {ideas: MERGE(ideas) , upvotes: TO_NUMBER(c.upvotes), downvotes: TO_NUMBER(c.downvotes)})
+")
                     .bind_var("ele", id.clone())
                     .batch_size(1);
             }
