@@ -4,7 +4,6 @@ use r2d2_arangodb::ArangodbConnectionManager;
 use serde::Deserialize;
 use serde::Serialize;
 
-
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

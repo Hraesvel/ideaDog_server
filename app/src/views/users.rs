@@ -10,7 +10,7 @@ use actix_web::{App, FutureResponse, HttpResponse, Path, State};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use arangors::AqlQuery;
 use chrono::Utc;
-use futures::future::{Future};
+use futures::future::Future;
 use ideadog::QUser;
 use ideadog::{Challenge, DbExecutor, Idea, Login, NewUser};
 use r2d2::Error;

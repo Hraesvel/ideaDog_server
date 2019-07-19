@@ -4,7 +4,6 @@ use arangors::AqlQuery;
 
 use r2d2::Error;
 
-
 use serde::{Deserialize, Serialize};
 
 use crate::models::{CastVote, Idea, NewIdea, Owner, QueryIdea, Sort};

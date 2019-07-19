@@ -8,15 +8,14 @@ use serde_json;
 
 use crate::{DbExecutor, NewUser, QUser, User};
 
-
 impl Handler<QUser> for DbExecutor {
     type Result = Result<User, MailboxError>;
 
     //noinspection RsExternalLinter
-	fn handle(&mut self, msg: QUser, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: QUser, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
-        let mut aql ;
+        let mut aql;
 
         match msg {
             QUser::TOKEN(tok) => {

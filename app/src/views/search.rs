@@ -8,7 +8,6 @@ use futures::future::Future;
 use ideadog::{DbExecutor, Idea, ServiceError};
 use serde::Deserialize;
 
-
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.resource("/search", |r| {
         r.method(Method::POST).with(search_for);

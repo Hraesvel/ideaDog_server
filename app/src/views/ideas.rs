@@ -14,7 +14,7 @@ use futures::future::{err, ok, Future};
 use ideadog::{CastVote, DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort};
 use reqwest;
 use reqwest::Url;
-use serde::{Deserialize};
+use serde::Deserialize;
 use std::env;
 
 //use actix_web::ws::Message;

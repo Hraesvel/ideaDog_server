@@ -4,10 +4,7 @@ use actix::MailboxError;
 use actix_web::actix;
 use actix_web::actix::{Handler, Message};
 use actix_web::http::{Cookie, Method, StatusCode};
-use actix_web::{
-    App, AsyncResponder, FutureResponse, HttpResponse, Json, Result,
-    State,
-};
+use actix_web::{App, AsyncResponder, FutureResponse, HttpResponse, Json, Result, State};
 
 use arangors::AqlQuery;
 use chrono::Utc;
