@@ -1,4 +1,4 @@
-use crate::{AppState};
+use crate::AppState;
 
 use crate::midware::AuthMiddleware;
 use crate::util::user::extract_token;
@@ -10,12 +10,11 @@ use actix_web::{App, FutureResponse, HttpResponse, Path, State};
 use actix_web::{AsyncResponder, HttpRequest, Json};
 use arangors::AqlQuery;
 use chrono::Utc;
-use futures::future::{err, ok, Future, IntoFuture};
+use futures::future::Future;
+use ideadog::QUser;
 use ideadog::{Challenge, DbExecutor, Idea, Login, NewUser};
-use ideadog::{QUser};
 use r2d2::Error;
 use serde::Deserialize;
-
 
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/user", |scope| {
@@ -74,16 +73,20 @@ impl Handler<UIdeas> for DbExecutor {
         let conn = self.0.get().unwrap();
 
         let aql = AqlQuery::new(
-            "FOR i in 1..1 INBOUND CONCAT('users/', @id ) idea_owner
-		SORT i.date DESC
-        RETURN i",
+            "FOR i, v in 1..1 INBOUND CONCAT('users/', @id ) idea_owner
+FILTER IS_DOCUMENT(DOCUMENT(v._from))
+SORT i.date DESC
+RETURN i",
         )
         .bind_var("id", msg.0)
         .batch_size(25);
 
         let response: Vec<Idea> = match conn.aql_query(aql) {
-            Ok(r) => r,
-            Err(_) => vec![],
+            Ok(r) => dbg!(r),
+            Err(e) => {
+                println!("Error: {}", e);
+                vec![]
+            }
         };
 
         Ok(response)

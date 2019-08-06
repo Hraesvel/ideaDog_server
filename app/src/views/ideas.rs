@@ -1,20 +1,21 @@
 use crate::AppState;
 
+use crate::util::idea::paginate;
 use crate::util::user::extract_token;
 use crate::AuthMiddleware;
 use actix_web::actix::{Handler, MailboxError, Message};
+
 use actix_web::http::{Method, NormalizePath, StatusCode};
 use actix_web::{App, FutureResponse, HttpRequest, HttpResponse, Json, Query, State};
 use actix_web::{AsyncResponder, Path};
 use arangors::AqlQuery;
 use futures;
 use futures::future::{err, ok, Future};
-use ideadog::{DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort, Pagination};
+use ideadog::{CastVote, DbExecutor, Idea, NewIdea, QueryIdea, ServiceError, Sort};
+use reqwest;
+use reqwest::Url;
 use serde::Deserialize;
-use serde_json::Value;
-use crate::util::idea::paginate;
-use actix_web::http::header::q;
-
+use std::env;
 
 //use actix_web::ws::Message;
 
@@ -45,7 +46,7 @@ pub fn config(cfg: App<AppState>) -> App<AppState> {
             })
             .resource("/{id}/{vote}", |r| {
                 r.middleware(AuthMiddleware);
-                r.method(Method::POST).with(update_idea_id);
+                r.method(Method::POST).with(vote_idea_id);
             })
     })
 }
@@ -56,7 +57,7 @@ struct Param {
     tags: Option<String>,
     count: Option<u32>,
     offset: Option<u32>,
-    q: Option<String>
+    q: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -86,7 +87,6 @@ fn fail_query() -> FutureResponse<HttpResponse> {
 fn get_ideas_sort(
     (path, q_string, state): (Path<String>, Query<Param>, State<AppState>),
 ) -> FutureResponse<HttpResponse> {
-
     let mut q = QueryIdea {
         sort: Sort::ALL,
         pagination: paginate(q_string.offset, q_string.count),
@@ -95,7 +95,7 @@ fn get_ideas_sort(
 
     // sets query field if exists and not an empty string
     if let Some(que) = &q_string.q {
-        if !que.is_empty(){
+        if !que.is_empty() {
             q.query = Some(que.clone())
         }
     }
@@ -116,7 +116,6 @@ fn get_ideas_sort(
 }
 
 fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureResponse<HttpResponse> {
-
     let mut q = QueryIdea {
         sort: Sort::ALL,
         pagination: paginate(q_string.offset, q_string.count),
@@ -126,7 +125,7 @@ fn get_ideas((q_string, state): (Query<Param>, State<AppState>)) -> FutureRespon
 
     // sets query field if exists and not an empty string
     if let Some(que) = &q_string.q {
-        if !que.is_empty(){
+        if !que.is_empty() {
             q.query = Some(que.clone())
         }
     }
@@ -175,32 +174,28 @@ fn create_idea((idea, state): (Json<IdeaForm>, State<AppState>)) -> FutureRespon
         .responder()
 }
 
-#[derive(Clone)]
-struct UserVote {
-    idea_id: String,
-    u_token: String,
-    vote: String,
-}
-
-fn update_idea_id(
+fn vote_idea_id(
     (req, path, state): (
         HttpRequest<AppState>,
         Path<(String, String)>,
         State<AppState>,
     ),
 ) -> FutureResponse<HttpResponse> {
-    let current_user = dbg!(extract_token(&req));
+    let current_user = extract_token(&req);
     let (id, vote) = path.into_inner();
 
     ok::<HttpResponse, actix_web::Error>(HttpResponse::Ok().finish())
         .and_then(|_| match vote.as_ref() {
             "upvote" => Ok(vote),
             "downvote" => Ok(vote),
-            _ => Err(ServiceError::NotFound.into()),
+            _ => {
+                println!("Error: action not found");
+                Err(ServiceError::NotFound.into())
+            }
         })
         .and_then(move |vote| {
             let user_vote = if let Some(token) = current_user {
-                Ok(UserVote {
+                Ok(CastVote {
                     idea_id: id,
                     u_token: token,
                     vote,
@@ -218,48 +213,13 @@ fn update_idea_id(
                 .from_err()
                 .and_then(|res| match res {
                     Ok(_) => Ok(HttpResponse::Ok().finish()),
-                    Err(_) => Err(ServiceError::NotFound.into()),
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        Err(ServiceError::NotFound.into())
+                    }
                 })
         })
         .responder()
-}
-
-impl Message for UserVote {
-    type Result = Result<Value, MailboxError>;
-}
-
-impl Handler<UserVote> for DbExecutor {
-    type Result = Result<Value, MailboxError>;
-
-    fn handle(&mut self, msg: UserVote, _ctx: &mut Self::Context) -> Self::Result {
-        let conn = self.0.get().unwrap();
-
-//		let req = reqwest::Client::new();
-//		let url = format!();
-//		req.post()
-
-        let aql = AqlQuery::new(
-            "LET user = FIRST (for u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @token) bearer_to_user RETURN u)
-                LET idea_id = DOCUMENT('ideas', @id)._id
-                UPSERT { _from: idea_id , _to: user._id }
-                INSERT { _from: idea_id , _to: user._id, vote: @vote }
-                UPDATE { vote: @vote } IN idea_voter LET vote = NEW
-                RETURN NEW"
-        ).batch_size(1)
-            .bind_var("vote", msg.vote)
-            .bind_var("token", msg.u_token)
-            .bind_var("id", msg.idea_id);
-
-        let response: Result<Value, MailboxError> = match conn.aql_query(aql) {
-            Ok(mut r) => Ok(r.pop().unwrap()),
-            Err(_e) => {
-                //println!("Error: {}", e);
-                Err(MailboxError::Closed)
-            }
-        };
-
-        response
-    }
 }
 
 fn delete_idea_id(
@@ -297,6 +257,7 @@ impl Message for DeleteIdea {
 impl Handler<DeleteIdea> for DbExecutor {
     type Result = Result<(), MailboxError>;
 
+    // TODO: use aql query to validate and get idea ID but use ArangoDB http Graph API to delete ideas.
     fn handle(&mut self, msg: DeleteIdea, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
         let aql = AqlQuery::new(
@@ -306,20 +267,50 @@ impl Handler<DeleteIdea> for DbExecutor {
             FILTER i._key == @idea_key
             return i
             )
-            let owner = FIRST (FOR v, e in 1..1 OUTBOUND idea._id idea_owner RETURN e)
-            REMOVE owner IN idea_owner let e = OLD
-            REMOVE idea IN ideas LET removed = OLD
-            return removed
+            RETURN idea
 		",
         )
         .bind_var("token", msg.token.clone())
         .bind_var("idea_key", msg.idea_id)
         .batch_size(1);
 
-        let response: Option<Vec<Idea>> = match conn.aql_query(aql) {
-            Ok(r) => Some(r),
+        //TODO change return Option<IDEA>
+        let response: Option<Idea> = match conn.aql_query(aql) {
+            Ok(mut r) => {
+                if !r.is_empty() {
+                    Some(r.pop().unwrap())
+                } else {
+                    None
+                }
+            }
             _ => None,
         };
+
+        if let Some(idea) = &response {
+            let url: Url = format!(
+                "http://{database_url}/_db/{db}/_api/gharial/{graph}/vertex/ideas/{idea_id}",
+                database_url = format!(
+                    "{}:{}",
+                    env::var("DB_HOST").expect("DB_HOST must be set."),
+                    env::var("DB_PORT").expect("DB_PORT must be set."),
+                ),
+                db = env::var("DB_NAME").expect("DB_NAME must be set"),
+                graph = env::var("DB_GRAPH_NAME").expect("DB_GRAPH_NAME must be set"),
+                idea_id = idea.key
+            )
+            .parse()
+            .unwrap();
+            let client = reqwest::Client::new();
+            let _req = client
+                .delete(url)
+                .basic_auth(
+                    env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
+                    Some(env::var("DB_PASSWORD").expect("DB_PASSWORD must be set.")),
+                )
+                .send();
+
+            //            dbg!(req);
+        }
 
         if let Some(_r) = response {
             return Ok(());

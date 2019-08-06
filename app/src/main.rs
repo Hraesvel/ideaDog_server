@@ -12,6 +12,9 @@ use r2d2_arangodb::{ArangodbConnectionManager, ConnectionOptions};
 use std::env;
 
 use midware::AuthMiddleware;
+use r2d2::Pool;
+use std::time::Duration;
+
 //routes
 mod midware;
 mod util;
@@ -46,26 +49,7 @@ fn main() {
     //actix System for handling Actors
     let ideadog_system = actix::System::new("ideaDog");
 
-    // arangodb connection configurations.
-    let arango_config = ConnectionOptions::builder()
-        .with_auth_jwt(
-            env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
-            env::var("DB_PASSWORD").expect("DB_PASSWORD must be set."),
-        )
-        .with_host(
-            env::var("DB_HOST").expect("DB_HOST must be set"),
-            env::var("DB_PORT")
-                .expect("DB_PORT must be set")
-                .parse()
-                .expect("DB_PORT must be digits"),
-        )
-        .with_db(env::var("DB_NAME").expect("DB_NAME must be set."))
-        .build();
-    let manager = ArangodbConnectionManager::new(arango_config);
-
-    let pool = r2d2::Pool::builder()
-        .build(manager)
-        .expect("Failed to create pool");
+    let pool = connect_with_pools(5, 15).unwrap();
 
     //create the SyncArbiters for r2d2
     let arbiter_cores = env::var("ARBITER_THREAD")
@@ -121,4 +105,56 @@ fn main() {
 
     println!("Starting http server: {}", hostname);
     let _ = ideadog_system.run();
+}
+
+/// Attempts to establish a connection with a database a x number times with time out y
+///
+/// #Arguments
+///  * 'tries' - number of tries to attempt before server will exit.
+///  * 'timeout' - Duration total time in which this operation should run. timeout / tries = intervals between attempts
+///
+fn connect_with_pools(tries: u8, timeout: u64) -> Option<Pool<ArangodbConnectionManager>> {
+    let arango_config = ConnectionOptions::builder()
+        .with_auth_basic(
+            env::var("DB_ACCOUNT").expect("DB_ACCOUNT must be set."),
+            env::var("DB_PASSWORD").expect("DB_PASSWORD must be set."),
+        )
+        .with_host(
+            env::var("DB_HOST").expect("DB_HOST must be set"),
+            env::var("DB_PORT")
+                .expect("DB_PORT must be set")
+                .parse()
+                .expect("DB_PORT must be digits"),
+        )
+        .with_db(env::var("DB_NAME").expect("DB_NAME must be set."))
+        .build();
+
+    let manager = ArangodbConnectionManager::new(arango_config);
+
+    let mut await_pool;
+    let mut conn_tries = 0;
+
+    loop {
+        match r2d2::Pool::builder()
+            .connection_timeout(Duration::new(timeout / tries as u64, 0))
+            .build(manager.clone())
+        {
+            Err(e) => println!("Error: {}", e),
+            Ok(r) => {
+                await_pool = Some(r);
+                break;
+            }
+        }
+
+        if conn_tries > tries {
+            println!(
+                "Exceeded establish connection attempts: number of tries {}",
+                conn_tries
+            );
+            std::process::exit(111);
+        }
+        conn_tries += 1;
+    }
+
+    await_pool
 }

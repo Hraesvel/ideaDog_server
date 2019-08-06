@@ -1,28 +1,26 @@
-use actix::Handler;
+use actix::{Handler, MailboxError};
 use arangors;
 use arangors::AqlQuery;
-use chrono::Utc;
-use r2d2::Error;
-use reqwest;
 
+use r2d2::Error;
 
 use serde::{Deserialize, Serialize};
 
-use crate::models::{Idea, NewIdea, Owner, QueryIdea, Sort};
-use crate::DbExecutor;
-use serde::export::PhantomData;
+use crate::models::{CastVote, Idea, NewIdea, Owner, QueryIdea, Sort};
+use crate::{DbExecutor, VoteStatus};
+
 use std::collections::HashMap;
 
+//noinspection RsExternalLinter
 // TODO: Design a idiomatic way to generate AQL queries,
-
 // Prototype for generating AQL queries as a stack
-struct ArangoQuery<SORT> {
-    collection: String,
-    filters: Option<Vec<String>>,
-    limit: Option<String>,
-    sort: Option<SORT>,
-    sub_query: Option<Box<ArangoQuery<SORT>>>,
-}
+//struct ArangoQuery<SORT> {
+//    collection: String,
+//    filters: Option<Vec<String>>,
+//    limit: Option<String>,
+//    sort: Option<SORT>,
+//    sub_query: Option<Box<ArangoQuery<SORT>>>,
+//}
 
 /// Generates a AQL FILTER line to be appended
 fn filter_with(data: Vec<String>) -> String {
@@ -38,7 +36,6 @@ fn filter_with(data: Vec<String>) -> String {
 }
 
 fn query_simple(msg: QueryIdea) -> String {
-
     let mut query = "FOR ele in ideas ".to_string();
     if let Some(tags) = msg.tags {
         query.push_str(filter_with(tags).as_str());
@@ -46,14 +43,16 @@ fn query_simple(msg: QueryIdea) -> String {
 
     match &msg.sort {
         Sort::ALL => query.push_str("SORT ele.date DESC "),
-        Sort::BRIGHT => {
-            query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
-        }
+        Sort::BRIGHT => query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC "),
     }
 
     if let Some(page) = msg.pagination {
         if page.count > 0 {
-            let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+            let page_str = format!(
+                " LIMIT {offset} , {count} ",
+                offset = page.offset,
+                count = page.count
+            );
             query.push_str(page_str.as_str());
         }
     }
@@ -64,7 +63,6 @@ fn query_simple(msg: QueryIdea) -> String {
 }
 
 fn query_with_search(msg: QueryIdea) -> String {
-
     let mut query = format!("FOR ele in idea_search SEARCH ANALYZER(ele.text IN TOKENS('{query}' , 'text_en'), 'text_en') "
                             , query=msg.query.unwrap().clone()
     );
@@ -75,16 +73,18 @@ fn query_with_search(msg: QueryIdea) -> String {
 
     match &msg.sort {
         Sort::ALL => query.push_str("SORT ele.date DESC "),
-        Sort::BRIGHT => {
-            query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
-        }
+        Sort::BRIGHT => query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC "),
     }
 
     query.push_str(" SORT TFIDF(ele) DESC ");
 
     if let Some(page) = msg.pagination {
         if page.count > 0 {
-            let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
+            let page_str = format!(
+                " LIMIT {offset} , {count} ",
+                offset = page.offset,
+                count = page.count
+            );
             query.push_str(page_str.as_str());
         }
     }
@@ -100,32 +100,8 @@ impl Handler<QueryIdea> for DbExecutor {
     fn handle(&mut self, msg: QueryIdea, _ctx: &mut Self::Context) -> Self::Result {
         let conn = &self.0.get().unwrap();
 
-//        let mut query = "FOR ele in ideas ".to_string();
-//
-//
-//        if let Some(tags) = msg.tags {
-//            query.push_str(filter_with(tags).as_str());
-//        }
-//
-//        // Handles Sort
-//        match &msg.sort {
-//            Sort::ALL => query.push_str("SORT ele.date DESC "),
-//            Sort::BRIGHT => {
-//                query.push_str("SORT (ele.upvotes / (ele.upvotes + ele.downvotes)) DESC ")
-//            }
-//        }
-//
-//        if let Some(page) = msg.pagination {
-//            if page.count > 0 {
-//                let page_str = format!(" LIMIT {offset} , {count} ", offset = page.offset, count = page.count);
-//                query.push_str(page_str.as_str());
-//            }
-//        }
-//
-//        query.push_str("RETURN ele");
-
         let aql = if let Some(id) = msg.id {
-            "RETURN DOCUMENT(CONCAT('ideas/', @id ))".to_string()
+            format!("RETURN DOCUMENT(CONCAT('ideas/', {id} ))", id = id)
         } else if msg.query.is_some() {
             query_with_search(msg)
         } else {
@@ -205,5 +181,81 @@ impl Handler<NewIdea> for DbExecutor {
             .unwrap();
 
         Ok(response)
+    }
+}
+
+impl Handler<CastVote> for DbExecutor {
+    type Result = Result<VoteStatus, MailboxError>;
+
+    fn handle(&mut self, msg: CastVote, _ctx: &mut Self::Context) -> Self::Result {
+        let conn = self.0.get().unwrap();
+
+        let aql = AqlQuery::new(
+            "LET user = FIRST (for u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @token) bearer_to_user RETURN u)
+                LET idea_id = DOCUMENT('ideas', @id)._id
+                UPSERT { _from: idea_id , _to: user._id }
+                INSERT { _from: idea_id , _to: user._id, vote: @vote }
+                UPDATE { vote: @vote } IN idea_voter LET prev = OLD LET new = NEW
+                RETURN {idea_id ,prev: OLD.vote, new: NEW.vote}"
+        ).batch_size(1)
+         .bind_var("vote", msg.vote)
+         .bind_var("token", msg.u_token)
+         .bind_var("id", msg.idea_id);
+
+        let response: Result<VoteStatus, MailboxError> = match conn.aql_query(aql) {
+            Ok(mut r) => Ok(r.pop().unwrap()),
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                return Err(MailboxError::Closed);
+            }
+        };
+
+        let answer = response.unwrap();
+
+        let resp = if answer.has_changed() {
+            let mut sub = 1;
+            if let Some(a) = &answer.new {
+                match a.as_ref() {
+                    "upvote" => {
+                        if answer.prev.is_none() {
+                            sub = 0
+                        };
+                        let _v : Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
+                            "LET doc = DOCUMENT(@idea_id)
+                            UPDATE doc with {upvotes: doc.upvotes + 1, downvotes : doc.downvotes - @sub } in ideas RETURN NEW
+                            ")
+                            .batch_size(1)
+                            .bind_var("sub", sub)
+                            .bind_var("idea_id", answer.idea_id));
+                        //                        dbg!(v);
+                    }
+                    "downvote" => {
+                        if answer.prev.is_none() {
+                            sub = 0
+                        };
+                        let _v: Result<Vec<Idea>, failure::Error> = conn.aql_query(AqlQuery::new(
+                            "LET doc = DOCUMENT(@idea_id)
+                            UPDATE doc with {upvotes: doc.upvotes - @sub, downvotes : doc.downvotes + 1 } in ideas RETURN NEW
+                            ")
+                            .batch_size(1)
+                            .bind_var("sub", sub)
+                            .bind_var("idea_id", answer.idea_id));
+                        //                        dbg!(v);
+                    }
+                    _ => unreachable!(),
+                };
+                return Ok(VoteStatus {
+                    idea_id: "".to_string(),
+                    prev: None,
+                    new: None,
+                });
+            } else {
+                Err(MailboxError::Closed)
+            }
+        } else {
+            Err(MailboxError::Closed)
+        };
+
+        resp
     }
 }

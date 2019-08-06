@@ -6,29 +6,54 @@ use r2d2::Error;
 
 use serde_json;
 
-use crate::{DbExecutor, NewUser, QUser, QueryUser, ServiceError, User};
-use std::collections::HashMap;
+use crate::{DbExecutor, NewUser, QUser, User};
 
-impl Handler<QueryUser> for DbExecutor {
+impl Handler<QUser> for DbExecutor {
     type Result = Result<User, MailboxError>;
 
-    fn handle(&mut self, msg: QueryUser, _ctx: &mut Self::Context) -> Self::Result {
+    //noinspection RsExternalLinter
+    fn handle(&mut self, msg: QUser, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
 
-        let mut aql = AqlQuery::new("");
+        let mut aql;
 
-        if let Some(t) = msg.token {
-            aql = AqlQuery::new(
+        match msg {
+            QUser::TOKEN(tok) => {
+                aql = AqlQuery::new(
 "
 let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
-let ideas = (FOR i in 1..1 INBOUND u._id idea_owner return {[i._key]: 'true'})
+let ideas = (FOR i in 1..1 INBOUND u._id idea_owner
+return {[i._key]: 'true'}
+)
+let c = FIRST (FOR i in 1..1 INBOUND u._id idea_owner
+Collect AGGREGATE upvotes = SUM(i.upvotes), downvotes = SUM(i.downvotes)
+return {upvotes, downvotes}
+)
 let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
-return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
-"
-			)
-				.bind_var("ele", t.clone())
-				.batch_size(1);
-		}
+return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes), upvotes: TO_NUMBER(c.upvotes), downvotes: TO_NUMBER(c.downvotes)})
+",
+                )
+                .bind_var("ele", tok.clone())
+                .batch_size(1);
+            }
+
+            QUser::ID(id) => {
+                aql = AqlQuery::new(
+"let u = DOCUMENT('users', @ele)
+let ideas = (FOR i in 1..1 INBOUND u._id idea_owner
+return {[i._key]: 'true'}
+)
+let c = FIRST (FOR i in 1..1 INBOUND u._id idea_owner
+Collect AGGREGATE upvotes = SUM(i.upvotes), downvotes = SUM(i.downvotes)
+return {upvotes, downvotes}
+)
+
+return Merge(u, {ideas: MERGE(ideas) , upvotes: TO_NUMBER(c.upvotes), downvotes: TO_NUMBER(c.downvotes)})
+")
+                    .bind_var("ele", id.clone())
+                    .batch_size(1);
+            }
+        }
 
         let response: Result<User, MailboxError> = match conn.aql_query(aql) {
             Ok(mut r) => {
@@ -39,53 +64,10 @@ return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
                 }
             }
             Err(e) => {
-                println!("Error: {}", e);
+                eprintln!("Error: {}", e);
                 Err(MailboxError::Closed)
             }
         };
-
-        response
-    }
-}
-
-impl Handler<QUser> for DbExecutor {
-    type Result = Result<User, MailboxError>;
-
-    fn handle(&mut self, msg: QUser, _ctx: &mut Self::Context) -> Self::Result {
-        let conn = self.0.get().unwrap();
-
-        let mut aql = AqlQuery::new("");
-
-        match msg {
-            QUser::TOKEN(tok) => {
-                aql = AqlQuery::new(
-"
-let u = FIRST (FOR u in 1..1 OUTBOUND DOCUMENT('bearer_tokens', @ele) bearer_to_user RETURN u)
-let ideas = (FOR i in 1..1 INBOUND u._id idea_owner return {[i._key]: 'true'})
-let votes = (FOR v, e in 1..1 INBOUND u._id idea_voter RETURN {[v._key]: e.vote })
-return Merge(u, {ideas: MERGE(ideas) ,votes: MERGE(votes)})
-",
-                )
-                .bind_var("ele", tok.clone())
-                .batch_size(1);
-            },
-
-            QUser::ID(id) => {
-                aql = AqlQuery::new("RETURN DOCUMENT('users', @ele)")
-                    .bind_var("ele", id.clone())
-                    .batch_size(1);
-            }
-        }
-
-		let response: Result<User, MailboxError>  = match conn.aql_query(aql) {
-			Ok(mut r) => {
-				if !r.is_empty() { Ok(r.pop().unwrap()) } else { Err(MailboxError::Closed)}
-			},
-			Err(e) => {
-				eprintln!("Error: {}", e);
-				Err(MailboxError::Closed)
-			}
-		};
 
         response
     }
