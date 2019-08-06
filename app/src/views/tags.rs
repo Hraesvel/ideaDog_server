@@ -9,7 +9,7 @@ use ideadog::{QueryTag, Sort};
 pub fn config(cfg: App<AppState>) -> App<AppState> {
     cfg.scope("/tags", |scope| {
         scope
-            .resource("", |resp| resp.method(Method::GET).with(get_tags))
+            .resource("/", |resp| resp.method(Method::GET).with(get_tags))
             .resource("/{id}", |resp| resp.method(Method::GET).with(get_one_tag))
             .resource("/{id}/ideas", |resp| {
                 resp.method(Method::GET).with(get_associations)
