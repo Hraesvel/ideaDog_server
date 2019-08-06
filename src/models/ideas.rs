@@ -3,7 +3,6 @@ use r2d2::PooledConnection;
 use r2d2_arangodb::ArangodbConnectionManager;
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::{BTreeMap, HashMap};
 
 type Connection = PooledConnection<ArangodbConnectionManager>;
 
@@ -60,16 +59,13 @@ pub struct Idea {
     pub owner: Owner,
     // This field is for the votes.
     #[serde(default)]
-    pub upvotes: u32,
+    pub upvotes: i32,
     #[serde(default)]
-    pub downvotes: u32,
+    pub downvotes: i32,
 
     pub tags: Vec<String>,
 
     pub date: i64,
-
-    #[serde(default)]
-    pub voters: Option<HashMap<String, bool>>,
 }
 
 #[derive(Debug, Clone)]
@@ -106,13 +102,37 @@ pub struct QueryIdea {
     // accept tags for query string
     pub tags: Option<Vec<String>>,
 
-    pub pagination : Option<Pagination>,
+    pub pagination: Option<Pagination>,
     // query search
-    pub query: Option<String>
+    pub query: Option<String>,
 }
 
 #[derive(Debug)]
 pub struct Pagination {
     pub count: u32,
     pub offset: u32,
+}
+
+#[derive(Clone)]
+pub struct CastVote {
+    pub idea_id: String,
+    pub u_token: String,
+    pub vote: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct VoteStatus {
+    pub idea_id: String,
+    pub prev: Option<String>,
+    pub new: Option<String>,
+}
+
+impl VoteStatus {
+    pub fn has_changed(&self) -> bool {
+        if self.prev != self.new {
+            true
+        } else {
+            false
+        }
+    }
 }

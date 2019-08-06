@@ -8,7 +8,7 @@ use failure::Error;
 impl Handler<Login> for DbExecutor {
     type Result = Result<Vec<bool>, Error>;
 
-    fn handle(&mut self, msg: Login, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Login, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
         let aql = AqlQuery::new(
             "for u in users
@@ -28,7 +28,7 @@ impl Handler<Login> for DbExecutor {
 impl Handler<Challenge> for DbExecutor {
     type Result = Result<String, Error>;
 
-    fn handle(&mut self, msg: Challenge, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Challenge, _ctx: &mut Self::Context) -> Self::Result {
         let conn = self.0.get().unwrap();
         let data = serde_json::to_value(msg).unwrap();
 
@@ -40,7 +40,7 @@ impl Handler<Challenge> for DbExecutor {
 
         let response: Option<Challenge> = match conn.aql_query(aql) {
             Ok(mut r) => Some(r.pop().unwrap()),
-            Err(e) => None,
+            Err(_e) => None,
         };
 
         Ok(response.unwrap().challenge)
